@@ -257,14 +257,15 @@ with tab2:
     
     st.subheader('Demographics filters')
 
-# ----- Sex -----
+#sex
     
     sex_options = sorted(df["SEX"].dropna().unique())
 
     selected_sex = st.radio(
         "Sex (choose one)",
         options=["Both"] + sex_options,
-        horizontal=True
+        horizontal=True,
+        key="tab2_sex_radio"
     )
 
     if selected_sex == "Both":
@@ -272,7 +273,7 @@ with tab2:
     else:
         subset = df[df["SEX"] == selected_sex]
 
-# ----- Age -----
+#age
     AGE_BIN_EDGES = ["under 15", "15", "25", "35", "45", "55", "65", "over 65"]
     Age_bin_names = ["Under 15", "15-24", "25-34", "35-44", "45-54", "55-64", "65 and older"]
 
@@ -280,7 +281,8 @@ with tab2:
         "Age range (non-inclusive on max)",
         options=AGE_BIN_EDGES,
         value=(AGE_BIN_EDGES[0], AGE_BIN_EDGES[-1]),
-        help="Each point is a bin edge; select a start and end bin."
+        help="Each point is a bin edge; select a start and end bin.",
+        key="tab2_sage"
     )
     age_min = AGE_BIN_EDGES.index(age_min)
     age_max = AGE_BIN_EDGES.index(age_max)
@@ -290,12 +292,13 @@ with tab2:
         subset["AGE"].isin(age_range)
     ]
 
-    # ----- Race -----
+#race
     race_options = sorted(df["RACE"].dropna().unique())
     selected_race = st.multiselect(
         "Race",
         options=race_options,
         default=race_options,
+        key="tab2_race"
     )
     subset = subset[subset["RACE"].isin(selected_race)]
 
@@ -305,6 +308,7 @@ with tab2:
         "Employment / Socio-economic status (EMPLOY)",
         options=employ_options,
         default=employ_options,
+        key="tab2_se"
     )
     subset = subset[subset["EMPLOY"].isin(selected_employ)]
 
@@ -314,13 +318,14 @@ with tab2:
         "Living arrangement / status (LIVARAG)",
         options=livarag_options,
         default=livarag_options,
+        key="tab2_ls"
     )
     subset = subset[subset["LIVARAG"].isin(selected_livarag)]
 
 # with SUB discorders or not 
     st.subheader('Whether people have a Substance use diagnosis or not')
 
-    dia = st.radio('Substance use related disorders diagonsis', ['NO','YES'])
+    dia = st.radio('Substance use related disorders diagonsis', ['YES','NO'])
 
     st.write("If you choose yes, the plots will focus on population with\
              substance-related disorders reported ")
@@ -384,6 +389,7 @@ with tab2:
         plot2 = plot2.configure_title(fontSize = 15, anchor = 'middle')
 
         st.altair_chart(plot2, use_container_width=False)
+
 
 
 
