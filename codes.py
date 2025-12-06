@@ -9,7 +9,8 @@ def load_data():
     Load the dataset. Assumes the dataset is named MHCLD_PUF_2023_clean.csv in the same working directory. 
     Download from Google Drive in links.txt.
     """
-    df = pd.read_csv("MHCLD_PUF_2023_clean.csv")
+    df = pd.read_csv('https://www.dropbox.com/scl/fi/ytd5f8ovcdzjs7yjjvh2o/MHCLD_df_2.csv?rlkey=oe7ldu71x3dp5fv0ctgdsaze9&st=uxuml7uv&dl=1',low_memory=False)
+    df['SUB_dia'] = ['NO' if i else 'YES' for i in df['SUB'].isnull()]
     return df
 
 df = load_data()
