@@ -7,7 +7,7 @@ import gdown
 @st.cache_data
 def load_data():
     """
-    Load the dataset from Google Drive using gdown (handles large files).
+    Load a sample of the dataset from Google Drive using gdown (handles large files).
     """
     file_id = '1UOmSnXrrHwPNVAeBBs_2abepE2Qqt4TT'
     url = f'https://drive.google.com/uc?id={file_id}'
@@ -44,9 +44,16 @@ def load_data():
         'IJSSERVICE': 'int8'
     }
     
-    df = pd.read_csv(output, dtype=dtypes)
+    # Load 250K rows - good balance of data size vs memory
+    # Adjust this number down (150K, 100K) if still crashes
+    df = pd.read_csv(output, nrows=250000, dtype=dtypes)
+    
+    # Add info banner to let users know this is a sample
+    st.info(f"Displaying sample of {len(df):,} rows for visualization (from full dataset)")
+    
     df['SUB_dia'] = ['NO' if pd.isna(i) else 'YES' for i in df['SUB']]
     return df
+
 df = load_data()
 
 # create three tabs
