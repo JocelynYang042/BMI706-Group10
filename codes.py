@@ -2,42 +2,51 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 from vega_datasets import data
-
+import gdown
 
 @st.cache_data
 def load_data():
     """
-    Load the dataset from Google Drive with optimized data types.
+    Load the dataset from Google Drive using gdown (handles large files).
     """
     file_id = '1UOmSnXrrHwPNVAeBBs_2abepE2Qqt4TT'
-    url = f'https://drive.google.com/uc?export=download&id={file_id}'
+    url = f'https://drive.google.com/uc?id={file_id}'
     
-    try:
-        # First, try loading without dtypes to see what we get
-        df = pd.read_csv(url, nrows=5)  # Load just 5 rows for debugging
-        
-        # Show what columns exist
-        st.write("### DEBUG: Columns found in CSV:")
-        st.write(list(df.columns))
-        st.write("### DEBUG: First few rows:")
-        st.write(df.head())
-        
-        # Now load full data
-        df = pd.read_csv(url)
-        
-        # Check if SUB exists
-        if 'SUB' in df.columns:
-            df['SUB_dia'] = ['NO' if pd.isna(i) else 'YES' for i in df['SUB']]
-        else:
-            st.error(f"'SUB' column not found! Available columns: {list(df.columns)}")
-            df['SUB_dia'] = 'UNKNOWN'
-        
-        return df
-        
-    except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
-        st.write("This might be an HTML page instead of CSV")
-        raise
+    # Download to temporary file
+    output = 'temp_data.csv'
+    gdown.download(url, output, quiet=False, fuzzy=True)
+    
+    # Optimize data types to reduce memory
+    dtypes = {
+        'AGE': 'category',
+        'SEX': 'category',
+        'RACE': 'category',
+        'EMPLOY': 'category',
+        'LIVARAG': 'category',
+        'STATEFIP': 'category',
+        'TRAUSTREFLG': 'int8',
+        'ANXIETYFLG': 'int8',
+        'ADHDFLG': 'int8',
+        'CONDUCTFLG': 'int8',
+        'DELIRDEMFLG': 'int8',
+        'BIPOLARFLG': 'int8',
+        'DEPRESSFLG': 'int8',
+        'ODDFLG': 'int8',
+        'PDDFLG': 'int8',
+        'PERSONFLG': 'int8',
+        'SCHIZOFLG': 'int8',
+        'ALCSUBFLG': 'int8',
+        'OTHERDISFLG': 'int8',
+        'SPHSERVICE': 'int8',
+        'CMPSERVICE': 'int8',
+        'OPISERVICE': 'int8',
+        'RTCSERVICE': 'int8',
+        'IJSSERVICE': 'int8'
+    }
+    
+    df = pd.read_csv(output, dtype=dtypes)
+    df['SUB_dia'] = ['NO' if pd.isna(i) else 'YES' for i in df['SUB']]
+    return df
 df = load_data()
 
 # create three tabs
