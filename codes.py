@@ -1,6 +1,7 @@
 import altair as alt
 import pandas as pd
 import streamlit as st
+from vega_datasets import data
 
 
 @st.cache_data
@@ -9,10 +10,9 @@ def load_data():
     Load the dataset. Assumes the dataset is named MHCLD_PUF_2023_clean.csv in the same working directory. 
     Download from Google Drive in links.txt.
     """
-    df = pd.read_csv('MHCLD_PUF_2023_clean.csv',low_memory=False)
+    df = pd.read_csv('MHCLD_PUF_2023_clean.csv')
     df['SUB_dia'] = ['NO' if i else 'YES' for i in df['SUB'].isnull()]
     return df
-
 df = load_data()
 
 # create three tabs
@@ -21,13 +21,13 @@ tab1, tab2, tab3 = st.tabs(["Diagnosed Mental Disorders", "Substance Use", "Ment
 # content for each tab
 with tab1:
     st.header("Diagnosed Mental Disorders")
-    st.write("!!! Explain what this page is about !!!")
+    st.write("This section provides visualization related to the distribution of various diagnosed mental disorders across different demographic groups in the US population.")
 
     subset = df.copy()
     
 
 
-    st.write("### Filters")
+    st.write("### Select Demographic Groups")
 
     # ----- Age -----
     AGE_BIN_EDGES = ["under 15", "15", "25", "35", "45", "55", "65", "over 65"]
@@ -89,18 +89,18 @@ with tab1:
     subset = subset[subset["LIVARAG"].isin(selected_livarag)]
 
     # ===== Debug / preview =====
-    st.markdown("### Filtered Data Preview for Debug")
-    for col in ["AGE", "SEX", "RACE", "EMPLOY", "LIVARAG"]:
-        st.write(f"col {col}, unique values are {subset[col].unique()}")
-    st.write(subset.head())
+    st.markdown("###Data Preview")
+    #for col in ["AGE", "SEX", "RACE", "EMPLOY", "LIVARAG"]:
+        #st.write(f"col {col}, unique values are {subset[col].unique()}")
+    #st.write(subset.head())
 
 
 
-    st.subheader("Stacked Bar Charts by Selected Categories")
+    #st.subheader("Stacked Bar Charts by Selected Categories")
     
     diagnosis_cols = [col for col in subset.columns if col.endswith("FLG")]
     long_df = subset.melt(
-        id_vars=["AGE", "RACE", "SEX", "EMPLOY", "LIVARAG", "STATEFIP"],
+        id_vars=["AGE", "RACE", "SEX", "EMPLOY", "LIVARAG", "STATEFIP", "STATEFIP_code"],
         value_vars=diagnosis_cols,
         var_name="Diagnosis",
         value_name="HasCondition"
@@ -122,7 +122,54 @@ with tab1:
         "ALCSUBFLG": "Alcohol Use Disorder",
         "OTHERDISFLG": "Other Disorder"
     }
-    
+    # map the flags to names
+    long_df_copy = long_df.copy()
+    long_df_copy["Diagnosis"] = long_df_copy["Diagnosis"].map(FLAG_TO_NAME)
+    st.write(long_df_copy.head())
+   
+    # -----map-----
+    st.subheader("Geographical Distribution of Diagnosed Mental Disorders Across US States")
+    st.write("Select a mental disorder from the dropdown to visualize its distribution.")
+    selected_diagnosis = st.selectbox(
+        "Select Diagnosis",
+        options=long_df_copy["Diagnosis"].unique()
+    )
+    #data aggregation for plotting
+    agg_map = long_df_copy[long_df_copy["Diagnosis"] == selected_diagnosis].groupby(["STATEFIP", "STATEFIP_code", "Diagnosis"]).size().reset_index(name="Count")
+    agg_map['STATEFIP_code'] = agg_map['STATEFIP_code'].astype(str)
+    states = alt.topo_feature(data.us_10m.url, 'states')
+    background = alt.Chart(states).mark_geoshape(
+        fill='lightgray',
+        stroke='white'
+    ).project(
+        type='albersUsa'
+    ).properties(
+        width=600,
+        height=400
+    )   
+    map_chart = alt.Chart(states).mark_geoshape(  
+            stroke='white',    
+        ).encode(
+            color=alt.Color('Count:Q', scale=alt.Scale(type = 'log', scheme='blues'), title='Number of Diagnoses'),
+            tooltip=[
+                alt.Tooltip('STATEFIP:N', title='State'),
+                alt.Tooltip('Count:Q', title='Number of Diagnoses')
+            ]
+        ).transform_lookup(
+            lookup='id',
+            from_=alt.LookupData(agg_map, 'STATEFIP_code', ['STATEFIP', 'Count'])
+        ).project(
+            type='albersUsa'   
+        ).properties(
+            width=600,
+            height=400
+        )
+    final_chart = (background + map_chart).properties(
+        title=f'Geographical Distribution of {selected_diagnosis} Diagnoses Across US States'
+    )
+    st.altair_chart(final_chart, use_container_width=True)
+
+    # ----- stacked bar charts -----
     st.subheader("Stacked Bar Charts by Selected Categories")
 
     # ----- Sex -----
@@ -244,6 +291,7 @@ with tab1:
         ),
         use_container_width=True
     )
+
 
 
 
@@ -396,7 +444,65 @@ with tab2:
 
 with tab3:
     st.header("Mental Health Service")
-    st.write("This section compares metrics across states.")
+    st.write("This section compares the rate of mental health service received across the states.")
     
-    # Placeholder for charts
-    st.write("Insert charts or maps here.")
+   #---Distribution Map---
+    service_cols = ["SPHSERVICE", "CMPSERVICE", "OPISERVICE", "RTCSERVICE", "IJSSERVICE"]
+    tab3_long_df = df.melt(
+        id_vars=["STATEFIP_code","STATEFIP"],
+        value_vars=service_cols,
+        var_name="Service",
+        value_name="HasService"
+    )
+    total_patients_num_state = df.groupby(["STATEFIP", "STATEFIP_code"]).size().reset_index(name="TotalPatients")
+    tab3_long_df = tab3_long_df[tab3_long_df["HasService"] == 1]
+    service_name = {
+        "SPHSERVICE": "State Psychiatric Hospital Services",
+        "CMPSERVICE": "SMHA-funded/operated Community-based Program",
+        "OPISERVICE": "Other Psychiatric Inpatient",
+        "RTCSERVICE": "Residential Treatment Center",
+        "IJSSERVICE": "Institutions Under The Justice System"
+    }
+    tab3_long_df["Service"] = tab3_long_df["Service"].map(service_name)
+    st.write("Select Mental Health Service Type")
+    selected_service = st.selectbox(
+        "Select Service",
+        options=tab3_long_df["Service"].unique()
+    )
+    tab3_agg_map = tab3_long_df[tab3_long_df["Service"] == selected_service].groupby(["STATEFIP", "STATEFIP_code", "Service"]).size().reset_index(name="Count")
+    tab3_agg_map = tab3_agg_map.merge(total_patients_num_state, on=["STATEFIP", "STATEFIP_code"])
+    tab3_agg_map["Rate"] = tab3_agg_map["Count"] / tab3_agg_map["TotalPatients"]
+    tab3_agg_map['STATEFIP_code'] = tab3_agg_map['STATEFIP_code'].astype(str)
+    st.write("Example data used for plotting:")
+    st.write(tab3_agg_map.head())
+    states = alt.topo_feature(data.us_10m.url, 'states')
+    background_tab3 = alt.Chart(states).mark_geoshape(
+        fill='lightgray',
+        stroke='white'
+    ).project(
+        type='albersUsa'
+    ).properties(
+        width=600,
+        height=400
+    )
+    map_chart_tab3 = alt.Chart(states).mark_geoshape(  
+            stroke='white'     
+        ).encode(
+            color=alt.Color('Rate:Q', scale=alt.Scale(type = 'log', scheme='greens'), title='Rate of Service Received'),
+            tooltip=[
+                alt.Tooltip('STATEFIP:N', title='State'),
+                alt.Tooltip('Rate:Q', title='Rate of Service Received'),
+            ]
+        ).transform_lookup(
+            lookup='id',
+            from_=alt.LookupData(tab3_agg_map, 'STATEFIP_code', ['STATEFIP', 'Rate'])
+        ).project(
+            type='albersUsa'   
+        ).properties(
+            width=600,
+            height=400
+        )
+    final_chart_tab3 = (background_tab3 + map_chart_tab3).properties(
+        title=f'Geographical Distribution of Rate of {selected_service} Received Across US States'
+    )
+    st.altair_chart(final_chart_tab3, use_container_width=True)
