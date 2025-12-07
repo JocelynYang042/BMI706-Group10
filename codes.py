@@ -139,8 +139,8 @@ with tab1:
             .encode(
                 y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
                 x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color(f"{"SEX"}:N", title="Sex"),
-                tooltip=["Diagnosis:N", f"{"SEX"}:N", "Count:Q"]
+                color=alt.Color(f'{"SEX"}:N', title="Sex"),
+                tooltip=["Diagnosis:N", f'{"SEX"}:N', "Count:Q"]
             )
             .properties(
                 title="Diagnosis Stacked by Sex"
@@ -163,8 +163,8 @@ with tab1:
             .encode(
                 y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
                 x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color(f"{"AGE"}:N", title="Age", scale=alt.Scale(scheme="blues")),
-                tooltip=["Diagnosis:N", f"{"AGE"}:N", "Count:Q"]
+                color=alt.Color(f'{"AGE"}:N', title="Age", scale=alt.Scale(scheme="blues")),
+                tooltip=["Diagnosis:N", f'{"AGE"}:N', "Count:Q"]
             )
             .properties(
                 title="Diagnosis Stacked by Age"
@@ -187,8 +187,8 @@ with tab1:
             .encode(
                 y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
                 x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color(f"{"RACE"}:N", title="Race"),
-                tooltip=["Diagnosis:N", f"{"RACE"}:N", "Count:Q"]
+                color=alt.Color(f'{"RACE"}:N', title="Race"),
+                tooltip=["Diagnosis:N", f'{"RACE"}:N', "Count:Q"]
             )
             .properties(
                 title="Diagnosis Stacked by Race"
@@ -211,8 +211,8 @@ with tab1:
             .encode(
                 y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
                 x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color(f"{"EMPLOY"}:N", title="Social-Economic Status"),
-                tooltip=["Diagnosis:N", f"{"EMPLOY"}:N", "Count:Q"]
+                color=alt.Color(f'{"EMPLOY"}:N', title="Social-Economic Status"),
+                tooltip=["Diagnosis:N", f'{"EMPLOY"}:N', "Count:Q"]
             )
             .properties(
                 title="Diagnosis Stacked by Social-Economic Status (EMPLOY)"
@@ -235,8 +235,8 @@ with tab1:
             .encode(
                 y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
                 x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color(f"{"LIVARAG"}:N", title="Living Status"),
-                tooltip=["Diagnosis:N", f"{"LIVARAG"}:N", "Count:Q"]
+                color=alt.Color(f'{"LIVARAG"}:N', title="Living Status"),
+                tooltip=["Diagnosis:N", f'{"LIVARAG"}:N', "Count:Q"]
             )
             .properties(
                 title="Diagnosis Stacked by Living Status (LIVARAG)"
