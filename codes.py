@@ -46,7 +46,7 @@ def load_data():
     
     # Load 250K rows - good balance of data size vs memory
     # Adjust this number down (150K, 100K) if still crashes
-    df = pd.read_csv(output, nrows=250000, dtype=dtypes)
+    df = pd.read_csv(output, nrows=50000, dtype=dtypes)
     
     # Add info banner to let users know this is a sample
     st.info(f"Displaying sample of {len(df):,} rows for visualization (from full dataset)")
