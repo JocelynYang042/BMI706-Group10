@@ -7,12 +7,42 @@ from vega_datasets import data
 @st.cache_data
 def load_data():
     """
-    Load the dataset from Google Drive.
+    Load the dataset from Google Drive with optimized data types.
     """
     file_id = '1UOmSnXrrHwPNVAeBBs_2abepE2Qqt4TT'
     url = f'https://drive.google.com/uc?export=download&id={file_id}'
-    df = pd.read_csv(url)
-    df['SUB_dia'] = ['NO' if i else 'YES' for i in df['SUB'].isnull()]
+    
+    # Optimize data types to reduce memory usage
+    dtypes = {
+        'AGE': 'category',
+        'SEX': 'category',
+        'RACE': 'category',
+        'EMPLOY': 'category',
+        'LIVARAG': 'category',
+        'STATEFIP': 'category',
+        # Flag columns as int8 instead of int64 (saves memory)
+        'TRAUSTREFLG': 'int8',
+        'ANXIETYFLG': 'int8',
+        'ADHDFLG': 'int8',
+        'CONDUCTFLG': 'int8',
+        'DELIRDEMFLG': 'int8',
+        'BIPOLARFLG': 'int8',
+        'DEPRESSFLG': 'int8',
+        'ODDFLG': 'int8',
+        'PDDFLG': 'int8',
+        'PERSONFLG': 'int8',
+        'SCHIZOFLG': 'int8',
+        'ALCSUBFLG': 'int8',
+        'OTHERDISFLG': 'int8',
+        'SPHSERVICE': 'int8',
+        'CMPSERVICE': 'int8',
+        'OPISERVICE': 'int8',
+        'RTCSERVICE': 'int8',
+        'IJSSERVICE': 'int8'
+    }
+    
+    df = pd.read_csv(url, dtype=dtypes)
+    df['SUB_dia'] = ['NO' if pd.isna(i) else 'YES' for i in df['SUB']]
     return df
 df = load_data()
 
