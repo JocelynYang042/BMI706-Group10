@@ -10,7 +10,7 @@ def load_data():
     Load the dataset from Google Drive.
     """
     file_id = '1UOmSnXrrHwPNVAeBBs_2abepE2Qqt4TT'
-    url = f'https://drive.google.com/uc?id={file_id}'
+    url = f'https://drive.google.com/uc?export=download&id={file_id}'
     df = pd.read_csv(url)
     df['SUB_dia'] = ['NO' if i else 'YES' for i in df['SUB'].isnull()]
     return df
