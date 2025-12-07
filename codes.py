@@ -7,10 +7,11 @@ from vega_datasets import data
 @st.cache_data
 def load_data():
     """
-    Load the dataset. Assumes the dataset is named MHCLD_PUF_2023_clean.csv in the same working directory. 
-    Download from Google Drive in links.txt.
+    Load the dataset from Google Drive.
     """
-    df = pd.read_csv('MHCLD_PUF_2023_clean.csv')
+    file_id = '1UOmSnXrrHwPNVAeBBs_2abepE2Qqt4TT'
+    url = f'https://drive.google.com/uc?id={file_id}'
+    df = pd.read_csv(url)
     df['SUB_dia'] = ['NO' if i else 'YES' for i in df['SUB'].isnull()]
     return df
 df = load_data()
