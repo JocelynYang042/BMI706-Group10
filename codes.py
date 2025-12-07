@@ -7,15 +7,8 @@ import gdown
 @st.cache_data
 def load_data():
     """
-    Load a sample of the dataset from Google Drive using gdown (handles large files).
+    Load sample dataset from local file.
     """
-    file_id = '1UOmSnXrrHwPNVAeBBs_2abepE2Qqt4TT'
-    url = f'https://drive.google.com/uc?id={file_id}'
-    
-    # Download to temporary file
-    output = 'temp_data.csv'
-    gdown.download(url, output, quiet=False, fuzzy=True)
-    
     # Optimize data types to reduce memory
     dtypes = {
         'AGE': 'category',
@@ -44,12 +37,11 @@ def load_data():
         'IJSSERVICE': 'int8'
     }
     
-    # Load 250K rows - good balance of data size vs memory
-    # Adjust this number down (150K, 100K) if still crashes
-    df = pd.read_csv(output, nrows=5000, dtype=dtypes)
+    # Load from local file (put your sample file in the repo)
+    df = pd.read_csv('MHCLD_sample.csv', dtype=dtypes)
     
-    # Add info banner to let users know this is a sample
-    st.info(f"Displaying sample of {len(df):,} rows for visualization (from full dataset)")
+    # Add info banner
+    st.info(f"Displaying sample of {len(df):,} rows for visualization")
     
     df['SUB_dia'] = ['NO' if pd.isna(i) else 'YES' for i in df['SUB']]
     return df
