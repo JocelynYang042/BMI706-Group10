@@ -5,6 +5,7 @@ from pathlib import Path
 from vega_datasets import data
 
 BASE_PATH = Path(__file__).resolve().parent
+AGE_BIN_LABELS = ["Under 15", "15-24", "25-34", "35-44", "45-54", "55-64", "65 and older"]
 DIAGNOSIS_COLS = [
     "TRAUSTREFLG",
     "ANXIETYFLG",
@@ -46,15 +47,24 @@ SERVICE_TO_NAME = {
 TYPE_MAP = FLAG_TO_NAME
 
 
+FILTER_COLUMNS = ["RACE", "SEX", "EMPLOY", "LIVARAG"]
+
+
 @st.cache_data
 def load_aggregated_data():
     """
     Load pre-aggregated datasets produced by precompute_stats.py.
+    Missing demographic values are filled with 'Missing' so the UI can include them.
     """
     demo_path = BASE_PATH / "data" / "demographic_service_stats.csv"
     substance_path = BASE_PATH / "data" / "substance_stats.csv"
     demographic = pd.read_csv(demo_path, dtype={"STATEFIP_code": str})
     substance = pd.read_csv(substance_path, dtype={"SAP": str})
+
+    for col in FILTER_COLUMNS:
+        demographic[col] = demographic[col].fillna("Missing")
+        substance[col] = substance[col].fillna("Missing")
+
     if "SUB_dia" not in substance.columns:
         substance["SUB_dia"] = substance["SUB"].notna().map({True: "YES", False: "NO"})
     return demographic, substance
@@ -110,13 +120,13 @@ else:
             specific mental disorders.")
 
 
-st.write("### Select Demographic Groups")
+filter_box = st.sidebar.container()
+filter_box.header("Select Demographic Groups")
 
 # ----- Age -----
 AGE_BIN_EDGES = ["under 15", "15", "25", "35", "45", "55", "65", "over 65"]
-Age_bin_names = ["Under 15", "15-24", "25-34", "35-44", "45-54", "55-64", "65 and older"]
 
-age_min, age_max = st.select_slider(
+age_min, age_max = filter_box.select_slider(
     "Age range (non-inclusive on max)",
     options=AGE_BIN_EDGES,
     value=(AGE_BIN_EDGES[0], AGE_BIN_EDGES[-1]),
@@ -124,12 +134,12 @@ age_min, age_max = st.select_slider(
 )
 age_min = AGE_BIN_EDGES.index(age_min)
 age_max = AGE_BIN_EDGES.index(age_max)
-age_range = Age_bin_names[age_min:age_max]
+age_range = AGE_BIN_LABELS[age_min:age_max]
 
 # ----- Sex -----
 sex_options = sorted(filter_reference["SEX"].dropna().unique())
 
-selected_sex = st.radio(
+selected_sex = filter_box.radio(
     "Sex (choose one)",
     options=["Both"] + sex_options,
     horizontal=True
@@ -139,7 +149,7 @@ sex_filter = sex_options if selected_sex == "Both" else [selected_sex]
 
 # ----- Race -----
 race_options = sorted(filter_reference["RACE"].dropna().unique())
-selected_race = st.multiselect(
+selected_race = filter_box.multiselect(
     "Race",
     options=race_options,
     default=race_options,
@@ -147,7 +157,7 @@ selected_race = st.multiselect(
 
 # ----- Socio-economic status (EMPLOY) -----
 employ_options = sorted(filter_reference["EMPLOY"].dropna().unique())
-selected_employ = st.multiselect(
+selected_employ = filter_box.multiselect(
     "Employment / Socio-economic status (EMPLOY)",
     options=employ_options,
     default=employ_options,
@@ -155,7 +165,7 @@ selected_employ = st.multiselect(
 
 # ----- Living status (LIVARAG) -----
 livarag_options = sorted(filter_reference["LIVARAG"].dropna().unique())
-selected_livarag = st.multiselect(
+selected_livarag = filter_box.multiselect(
     "Living arrangement / status (LIVARAG)",
     options=livarag_options,
     default=livarag_options,
@@ -302,7 +312,12 @@ if view_type == "Diagnosed Mental Disorders":
             .encode(
                 y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
                 x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color("AGE:N", title="Age", scale=alt.Scale(scheme="blues"), legend=alt.Legend(labelLimit=0)),
+                color=alt.Color(
+                    "AGE:N",
+                    title="Age",
+                    scale=alt.Scale(scheme="blues", domain=AGE_BIN_LABELS),
+                    legend=alt.Legend(labelLimit=0)
+                ),
                 tooltip=["Diagnosis:N", "AGE:N", "Count:Q"],
                 opacity=alt.condition(age_selection, alt.value(1), alt.value(0.2))
             )
@@ -519,7 +534,7 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
                 color=alt.Color(
                     "AGE:N",
                     title="Age",
-                    scale=alt.Scale(scheme="blues"),
+                    scale=alt.Scale(scheme="blues", domain=AGE_BIN_LABELS),
                     legend=alt.Legend(labelLimit=0)
                 ),
                 tooltip=["Service:N", "AGE:N", "Count:Q"],
