@@ -1,19 +1,89 @@
 import altair as alt
 import pandas as pd
 import streamlit as st
+from pathlib import Path
 from vega_datasets import data
+
+BASE_PATH = Path(__file__).resolve().parent
+DIAGNOSIS_COLS = [
+    "TRAUSTREFLG",
+    "ANXIETYFLG",
+    "ADHDFLG",
+    "CONDUCTFLG",
+    "DELIRDEMFLG",
+    "BIPOLARFLG",
+    "DEPRESSFLG",
+    "ODDFLG",
+    "PDDFLG",
+    "PERSONFLG",
+    "SCHIZOFLG",
+    "ALCSUBFLG",
+    "OTHERDISFLG",
+]
+SERVICE_COLS = ["SPHSERVICE", "CMPSERVICE", "OPISERVICE", "RTCSERVICE", "IJSSERVICE"]
+FLAG_TO_NAME = {
+    "TRAUSTREFLG": "Trauma & Stressor Disorder",
+    "ANXIETYFLG": "Anxiety Disorder",
+    "ADHDFLG": "ADHD",
+    "CONDUCTFLG": "Conduct Disorder",
+    "DELIRDEMFLG": "Delirium / Dementia",
+    "BIPOLARFLG": "Bipolar Disorder",
+    "DEPRESSFLG": "Depression",
+    "ODDFLG": "Oppositional Defiant Disorder",
+    "PDDFLG": "Pervasive Developmental Disorder",
+    "PERSONFLG": "Personality Disorder",
+    "SCHIZOFLG": "Schizophrenia",
+    "ALCSUBFLG": "Alcohol Use Disorder",
+    "OTHERDISFLG": "Other Disorder",
+}
+SERVICE_TO_NAME = {
+    "SPHSERVICE": "State Psychiatric Hospital Services",
+    "CMPSERVICE": "SMHA-funded/operated Community-based Program",
+    "OPISERVICE": "Other Psychiatric Inpatient",
+    "RTCSERVICE": "Residential Treatment Center",
+    "IJSSERVICE": "Institutions Under The Justice System",
+}
+TYPE_MAP = FLAG_TO_NAME
 
 
 @st.cache_data
-def load_data():
+def load_aggregated_data():
     """
-    Load the dataset. Assumes the dataset is named MHCLD_PUF_2023_clean.csv in the same working directory. 
-    Download from Google Drive in links.txt.
+    Load pre-aggregated datasets produced by precompute_stats.py.
     """
-    df = pd.read_csv('https://www.dropbox.com/scl/fi/lwvmdxby5jx6ns9u2vfgw/MHCLD_sample.csv?rlkey=d49orz62ufwychzdc0olebh1j&st=72zrbbzl&dl=1',low_memory=False)
-    df['SUB_dia'] = ['NO' if i else 'YES' for i in df['SUB'].isnull()]
-    return df
-df = load_data()
+    demo_path = BASE_PATH / "data" / "demographic_service_stats.csv"
+    substance_path = BASE_PATH / "data" / "substance_stats.csv"
+    demographic = pd.read_csv(demo_path, dtype={"STATEFIP_code": str})
+    substance = pd.read_csv(substance_path, dtype={"SAP": str})
+    if "SUB_dia" not in substance.columns:
+        substance["SUB_dia"] = substance["SUB"].notna().map({True: "YES", False: "NO"})
+    return demographic, substance
+
+
+demographic_df, substance_df = load_aggregated_data()
+filter_reference = pd.concat(
+    [
+        demographic_df[["AGE", "RACE", "SEX", "EMPLOY", "LIVARAG"]],
+        substance_df[["AGE", "RACE", "SEX", "EMPLOY", "LIVARAG"]],
+    ],
+    ignore_index=True,
+)
+
+
+def apply_demographic_filters(
+    df: pd.DataFrame,
+    age_range: list[str],
+    sex_values: list[str],
+    races: list[str],
+    employ_status: list[str],
+    living_status: list[str],
+) -> pd.DataFrame:
+    subset = df[df["AGE"].isin(age_range)]
+    subset = subset[subset["SEX"].isin(sex_values)]
+    subset = subset[subset["RACE"].isin(races)]
+    subset = subset[subset["EMPLOY"].isin(employ_status)]
+    subset = subset[subset["LIVARAG"].isin(living_status)]
+    return subset
 
 # create two tabs (merged tab 1 and 3)
 #tab1, tab2 = st.tabs(["Diagnosed Mental Disorders & Mental Health Service", "Substance Use"])
@@ -40,8 +110,6 @@ else:
             specific mental disorders.")
 
 
-subset = df.copy()
-
 st.write("### Select Demographic Groups")
 
 # ----- Age -----
@@ -58,12 +126,8 @@ age_min = AGE_BIN_EDGES.index(age_min)
 age_max = AGE_BIN_EDGES.index(age_max)
 age_range = Age_bin_names[age_min:age_max]
 
-subset = subset[
-    subset["AGE"].isin(age_range)
-]
-
 # ----- Sex -----
-sex_options = sorted(df["SEX"].dropna().unique())
+sex_options = sorted(filter_reference["SEX"].dropna().unique())
 
 selected_sex = st.radio(
     "Sex (choose one)",
@@ -71,80 +135,84 @@ selected_sex = st.radio(
     horizontal=True
 )
 
-if selected_sex == "Both":
-    subset = subset[subset["SEX"].isin(sex_options)]
-else:
-    subset = subset[subset["SEX"] == selected_sex]
+sex_filter = sex_options if selected_sex == "Both" else [selected_sex]
 
 # ----- Race -----
-race_options = sorted(df["RACE"].dropna().unique())
+race_options = sorted(filter_reference["RACE"].dropna().unique())
 selected_race = st.multiselect(
     "Race",
     options=race_options,
     default=race_options,
 )
-subset = subset[subset["RACE"].isin(selected_race)]
 
 # ----- Socio-economic status (EMPLOY) -----
-employ_options = sorted(df["EMPLOY"].dropna().unique())
+employ_options = sorted(filter_reference["EMPLOY"].dropna().unique())
 selected_employ = st.multiselect(
     "Employment / Socio-economic status (EMPLOY)",
     options=employ_options,
     default=employ_options,
 )
-subset = subset[subset["EMPLOY"].isin(selected_employ)]
 
 # ----- Living status (LIVARAG) -----
-livarag_options = sorted(df["LIVARAG"].dropna().unique())
+livarag_options = sorted(filter_reference["LIVARAG"].dropna().unique())
 selected_livarag = st.multiselect(
     "Living arrangement / status (LIVARAG)",
     options=livarag_options,
     default=livarag_options,
 )
-subset = subset[subset["LIVARAG"].isin(selected_livarag)]
+demographic_subset = apply_demographic_filters(
+    demographic_df,
+    age_range,
+    sex_filter,
+    selected_race,
+    selected_employ,
+    selected_livarag,
+)
+substance_subset = apply_demographic_filters(
+    substance_df,
+    age_range,
+    sex_filter,
+    selected_race,
+    selected_employ,
+    selected_livarag,
+)
 
 
 # ----- Conditional rendering based on view type -----
 if view_type == "Diagnosed Mental Disorders":
-    # Original Tab 1 content
-    diagnosis_cols = [col for col in subset.columns if col.endswith("FLG")]
-    long_df = subset.melt(
-        id_vars=["AGE", "RACE", "SEX", "EMPLOY", "LIVARAG", "STATEFIP", "STATEFIP_code"],
-        value_vars=diagnosis_cols,
-        var_name="Diagnosis",
-        value_name="HasCondition"
-    )
-    long_df = long_df[long_df["HasCondition"] == 1]
+    if demographic_subset.empty:
+        st.warning("No diagnosed disorders found for the selected demographic filters.")
+        st.stop()
 
-    FLAG_TO_NAME = {
-        "TRAUSTREFLG": "Trauma & Stressor Disorder",
-        "ANXIETYFLG": "Anxiety Disorder",
-        "ADHDFLG": "ADHD",
-        "CONDUCTFLG": "Conduct Disorder",
-        "DELIRDEMFLG": "Delirium / Dementia",
-        "BIPOLARFLG": "Bipolar Disorder",
-        "DEPRESSFLG": "Depression",
-        "ODDFLG": "Oppositional Defiant Disorder",
-        "PDDFLG": "Pervasive Developmental Disorder",
-        "PERSONFLG": "Personality Disorder",
-        "SCHIZOFLG": "Schizophrenia",
-        "ALCSUBFLG": "Alcohol Use Disorder",
-        "OTHERDISFLG": "Other Disorder"
-    }
-    
+    long_df = demographic_subset.melt(
+        id_vars=["AGE", "RACE", "SEX", "EMPLOY", "LIVARAG", "STATEFIP", "STATEFIP_code"],
+        value_vars=DIAGNOSIS_COLS,
+        var_name="Diagnosis",
+        value_name="Count"
+    )
+    long_df = long_df[long_df["Count"] > 0]
     long_df_copy = long_df.copy()
     long_df_copy["Diagnosis"] = long_df_copy["Diagnosis"].map(FLAG_TO_NAME)
 
     # -----map-----
     st.subheader("Geographical Distribution of Diagnosed Mental Disorders Across US States")
     st.write("Select a mental disorder from the dropdown to visualize its distribution.")
+    diagnosis_options = long_df_copy["Diagnosis"].dropna().unique()
+    if len(diagnosis_options) == 0:
+        st.warning("No diagnoses available after filtering.")
+        st.stop()
+
     selected_diagnosis = st.selectbox(
         "Select Diagnosis",
-        options=long_df_copy["Diagnosis"].unique()
+        options=sorted(diagnosis_options)
     )
 
     # Data aggregation for plotting
-    agg_map = long_df_copy[long_df_copy["Diagnosis"] == selected_diagnosis].groupby(["STATEFIP", "STATEFIP_code", "Diagnosis"]).size().reset_index(name="Count")
+    agg_map = (
+        long_df_copy[long_df_copy["Diagnosis"] == selected_diagnosis]
+        .groupby(["STATEFIP", "STATEFIP_code", "Diagnosis"], as_index=False)["Count"]
+        .sum()
+    )
     agg_map['STATEFIP_code'] = agg_map['STATEFIP_code'].astype(str)
     states = alt.topo_feature(data.us_10m.url, 'states')
 
@@ -196,9 +264,8 @@ if view_type == "Diagnosed Mental Disorders":
 
     # ----- Sex -----
     agg = (
-        long_df.groupby(["Diagnosis", "SEX"])
-        .size()
-        .reset_index(name="Count")
+        long_df.groupby(["Diagnosis", "SEX"], as_index=False)["Count"]
+        .sum()
     )
     agg["Diagnosis"] = agg["Diagnosis"].map(FLAG_TO_NAME)
     sex_selection = alt.selection_point(fields=["SEX"], bind="legend")
@@ -223,9 +290,8 @@ if view_type == "Diagnosed Mental Disorders":
 
     # ----- Age -----
     agg = (
-        long_df.groupby(["Diagnosis", "AGE"])
-        .size()
-        .reset_index(name="Count")
+        long_df.groupby(["Diagnosis", "AGE"], as_index=False)["Count"]
+        .sum()
     )
     agg["Diagnosis"] = agg["Diagnosis"].map(FLAG_TO_NAME)
     age_selection = alt.selection_point(fields=["AGE"], bind="legend")
@@ -250,9 +316,8 @@ if view_type == "Diagnosed Mental Disorders":
 
     # ----- Race -----
     agg = (
-        long_df.groupby(["Diagnosis", "RACE"])
-        .size()
-        .reset_index(name="Count")
+        long_df.groupby(["Diagnosis", "RACE"], as_index=False)["Count"]
+        .sum()
     )
     agg["Diagnosis"] = agg["Diagnosis"].map(FLAG_TO_NAME)
     race_selection = alt.selection_point(fields=["RACE"], bind="legend")
@@ -277,9 +342,8 @@ if view_type == "Diagnosed Mental Disorders":
 
     # ----- Social-econ status -----
     agg = (
-        long_df.groupby(["Diagnosis", "EMPLOY"])
-        .size()
-        .reset_index(name="Count")
+        long_df.groupby(["Diagnosis", "EMPLOY"], as_index=False)["Count"]
+        .sum()
     )
     agg["Diagnosis"] = agg["Diagnosis"].map(FLAG_TO_NAME)
     employ_selection = alt.selection_point(fields=["EMPLOY"], bind="legend")
@@ -304,9 +368,8 @@ if view_type == "Diagnosed Mental Disorders":
 
     # ----- Living status -----
     agg = (
-        long_df.groupby(["Diagnosis", "LIVARAG"])
-        .size()
-        .reset_index(name="Count")
+        long_df.groupby(["Diagnosis", "LIVARAG"], as_index=False)["Count"]
+        .sum()
     )
     agg["Diagnosis"] = agg["Diagnosis"].map(FLAG_TO_NAME)
     livarag_selection = alt.selection_point(fields=["LIVARAG"], bind="legend")
@@ -330,38 +393,40 @@ if view_type == "Diagnosed Mental Disorders":
     )
 
 elif view_type == "Mental Health Service Use": # Mental Health Service Use
-    # Original Tab 3 content
-    service_cols = ["SPHSERVICE", "CMPSERVICE", "OPISERVICE", "RTCSERVICE", "IJSSERVICE"]
-    long_df = subset.melt(
+    if demographic_subset.empty:
+        st.warning("No service utilization data matched the selected demographic filters.")
+        st.stop()
+
+    long_df = demographic_subset.melt(
         id_vars=["AGE", "RACE", "SEX", "EMPLOY", "LIVARAG", "STATEFIP", "STATEFIP_code"],
-        value_vars=service_cols,
+        value_vars=SERVICE_COLS,
         var_name="Service",
-        value_name="HasService"
+        value_name="Count"
     )
     
-    long_df = long_df[long_df["HasService"] == 1]
-    
-    SERVICE_TO_NAME = {
-        "SPHSERVICE": "State Psychiatric Hospital Services",
-        "CMPSERVICE": "SMHA-funded/operated Community-based Program",
-        "OPISERVICE": "Other Psychiatric Inpatient",
-        "RTCSERVICE": "Residential Treatment Center",
-        "IJSSERVICE": "Institutions Under The Justice System"
-    }
-    
+    long_df = long_df[long_df["Count"] > 0]
     long_df_copy = long_df.copy()
     long_df_copy["Service"] = long_df_copy["Service"].map(SERVICE_TO_NAME)
     
     # -----map-----
     st.subheader("Geographical Distribution of Mental Health Service Use Across US States")
     st.write("Select a mental health service type from the dropdown to visualize its distribution.")
+    service_options = long_df_copy["Service"].dropna().unique()
+    if len(service_options) == 0:
+        st.warning("No services available after filtering.")
+        st.stop()
+
     selected_service = st.selectbox(
         "Select Service",
-        options=long_df_copy["Service"].unique()
+        options=sorted(service_options)
     )
     
     # Data aggregation for plotting
-    agg_map = long_df_copy[long_df_copy["Service"] == selected_service].groupby(["STATEFIP", "STATEFIP_code", "Service"]).size().reset_index(name="Count")
+    agg_map = (
+        long_df_copy[long_df_copy["Service"] == selected_service]
+        .groupby(["STATEFIP", "STATEFIP_code", "Service"], as_index=False)["Count"]
+        .sum()
+    )
     agg_map['STATEFIP_code'] = agg_map['STATEFIP_code'].astype(str)
     
     states = alt.topo_feature(data.us_10m.url, 'states')
@@ -404,9 +469,8 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
 
     # ----- Sex -----
     agg = (
-        long_df.groupby(["Service", "SEX"])
-        .size()
-        .reset_index(name="Count")
+        long_df.groupby(["Service", "SEX"], as_index=False)["Count"]
+        .sum()
     )
     agg["Service"] = agg["Service"].map(SERVICE_TO_NAME)
     service_sex_selection = alt.selection_point(fields=["SEX"], bind="legend")
@@ -436,9 +500,8 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
 
     # ----- Age -----
     agg = (
-        long_df.groupby(["Service", "AGE"])
-        .size()
-        .reset_index(name="Count")
+        long_df.groupby(["Service", "AGE"], as_index=False)["Count"]
+        .sum()
     )
     agg["Service"] = agg["Service"].map(SERVICE_TO_NAME)
     service_age_selection = alt.selection_point(fields=["AGE"], bind="legend")
@@ -473,9 +536,8 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
 
     # ----- Race -----
     agg = (
-        long_df.groupby(["Service", "RACE"])
-        .size()
-        .reset_index(name="Count")
+        long_df.groupby(["Service", "RACE"], as_index=False)["Count"]
+        .sum()
     )
     agg["Service"] = agg["Service"].map(SERVICE_TO_NAME)
     service_race_selection = alt.selection_point(fields=["RACE"], bind="legend")
@@ -505,9 +567,8 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
 
     # ----- Social-econ status -----
     agg = (
-        long_df.groupby(["Service", "EMPLOY"])
-        .size()
-        .reset_index(name="Count")
+        long_df.groupby(["Service", "EMPLOY"], as_index=False)["Count"]
+        .sum()
     )
     agg["Service"] = agg["Service"].map(SERVICE_TO_NAME)
     service_employ_selection = alt.selection_point(fields=["EMPLOY"], bind="legend")
@@ -541,9 +602,8 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
 
     # ----- Living status -----
     agg = (
-        long_df.groupby(["Service", "LIVARAG"])
-        .size()
-        .reset_index(name="Count")
+        long_df.groupby(["Service", "LIVARAG"], as_index=False)["Count"]
+        .sum()
     )
     agg["Service"] = agg["Service"].map(SERVICE_TO_NAME)
     service_livarag_selection = alt.selection_point(fields=["LIVARAG"], bind="legend")
@@ -581,25 +641,43 @@ else:
             health disorder distribution differs for the population with a \
             substance-related problem, but no diagnosis, and the population with no \
             substance-related problem ")
-    subset = subset[subset["SUB_dia"] == dia]
+    subset = substance_subset[substance_subset["SUB_dia"] == dia]
+    if subset.empty:
+        st.warning("No records matched the selected demographic filters for this substance-use view.")
+        st.stop()
+
     if dia == 'YES':
-        subset = subset[["TRAUSTREFLG", "ANXIETYFLG", "ADHDFLG", "CONDUCTFLG",
-                        "DELIRDEMFLG", "BIPOLARFLG", "DEPRESSFLG", "ODDFLG",
-                        "PDDFLG", "PERSONFLG", "SCHIZOFLG", "OTHERDISFLG","SUB"]].groupby('SUB').sum()
-        subset.columns = ['mh_' + i for i in subset.columns]
-        subset = subset.reset_index()
-        subset = pd.wide_to_long(subset, stubnames='mh', i='SUB', j='types_reported',sep='_', suffix=r'\w+').reset_index()
-        brush = alt.selection_interval( encodings=['x'])
+        subset = subset.dropna(subset=["SUB"])
+        if subset.empty:
+            st.warning("No substance-use diagnoses available for the selected filters.")
+            st.stop()
+
+        subset = subset.melt(
+            id_vars=["SUB"],
+            value_vars=DIAGNOSIS_COLS,
+            var_name="types_reported",
+            value_name="mh"
+        )
+        subset = (
+            subset.groupby(["SUB", "types_reported"], as_index=False)["mh"]
+            .sum()
+        )
+        subset = subset[subset["mh"] > 0]
+        if subset.empty:
+            st.warning("No diagnosis counts available for the selected substance-use category.")
+            st.stop()
+        subset["types_reported"] = subset["types_reported"].map(TYPE_MAP).fillna(subset["types_reported"])
+        brush = alt.selection_interval(encodings=['x'])
         
         chart = alt.Chart(subset).mark_rect().encode(
-            x=alt.X("types_reported:N"),
-            y=alt.Y("SUB:N", title="substance-related disorders"),
-            color=alt.Color("mh:Q",scale = alt.Scale(type = 'log',domain=(0.01, 1000), clamp=True),legend = alt.Legend(title = 'log(count)')),
+            x=alt.X("types_reported:N", title="Mental health disorders"),
+            y=alt.Y("SUB:N", title="Substance-related disorders"),
+            color=alt.Color("mh:Q", scale=alt.Scale(type='log', clamp=True), legend=alt.Legend(title='log(count)')),
             tooltip=[
                 alt.Tooltip("mh:Q", title="count"),
-                alt.Tooltip("SUB", title="Asubstnce disorders"),
-                alt.Tooltip("types_reported", title="mental health disorders")
-                ],).properties(width = 600).add_params(brush)
+                alt.Tooltip("SUB", title="Substance disorders"),
+                alt.Tooltip("types_reported", title="Mental health disorders")
+                ],).properties(width=600).add_params(brush)
         t = subset.groupby(["SUB"])['mh'].sum()
         map_pop = dict(zip(t.index.values, t.values))
         subset['pop'] = subset['SUB'].map(map_pop)
@@ -612,33 +690,25 @@ else:
         combine_c = alt.vconcat(chart, chart_bar)
         st.altair_chart(combine_c, use_container_width=True)
     if dia == 'NO':
-        subset = subset[["TRAUSTREFLG", "ANXIETYFLG", "ADHDFLG", "CONDUCTFLG",
-                        "DELIRDEMFLG", "BIPOLARFLG", "DEPRESSFLG", "ODDFLG",
-                        "PDDFLG", "PERSONFLG", "SCHIZOFLG", "OTHERDISFLG",'SAP']].set_index('SAP')
-        subset.columns = ['mh_' + i for i in subset.columns]
-        subset = subset.reset_index().dropna()
-        subset['id'] = subset.index
-        subset = pd.wide_to_long(subset, stubnames='mh', i='id', j='types_reported',sep='_', suffix=r'\w+')
-        subset = subset.groupby(['types_reported','SAP']).sum()['mh'].reset_index()
-        subset['SAP'] = subset['SAP'].astype(str)
+        subset = subset.melt(
+            id_vars=["SAP"],
+            value_vars=DIAGNOSIS_COLS,
+            var_name="types_reported",
+            value_name="mh"
+        )
+        subset = (
+            subset.groupby(['types_reported','SAP'], as_index=False)["mh"]
+            .sum()
+        )
+        subset = subset[subset["mh"] > 0]
+        if subset.empty:
+            st.warning("No counts available for the selected filters and SAP grouping.")
+            st.stop()
+        subset['SAP'] = subset['SAP'].fillna('missing').astype(str)
         
-        SAP_map = {'1.0':'problem','0.0':'no problen'}
-        type_map = {
-        "TRAUSTREFLG": "Trauma & Stressor Disorder",
-        "ANXIETYFLG": "Anxiety Disorder",
-        "ADHDFLG": "ADHD",
-        "CONDUCTFLG": "Conduct Disorder",
-        "DELIRDEMFLG": "Delirium / Dementia",
-        "BIPOLARFLG": "Bipolar Disorder",
-        "DEPRESSFLG": "Depression",
-        "ODDFLG": "Oppositional Defiant Disorder",
-        "PDDFLG": "Pervasive Developmental Disorder",
-        "PERSONFLG": "Personality Disorder",
-        "SCHIZOFLG": "Schizophrenia",
-        "ALCSUBFLG": "Alcohol Use Disorder",
-        "OTHERDISFLG": "Other Disorder"}
-        subset['SAP'] = subset['SAP'].map(SAP_map)
-        subset['types_reported'] = subset['types_reported'].map(type_map)
+        SAP_map = {'1.0':'problem','0.0':'no problem','missing': 'missing'}
+        subset['SAP'] = subset['SAP'].map(SAP_map).fillna(subset['SAP'])
+        subset['types_reported'] = subset['types_reported'].map(TYPE_MAP).fillna(subset['types_reported'])
         plot2 = alt.Chart(subset).mark_bar().encode(x = alt.X('SAP:N') , 
                                                 y = alt.Y('mh:Q',
                                                             scale = alt.Scale(type = 'sqrt')).title('count of the mental health disorders'), 
@@ -647,5 +717,3 @@ else:
                                                             title = 'Distribution of total count of mental health across types and substances use problem(SAP)')
         plot2 = plot2.configure_title(fontSize = 15, anchor = 'middle')
         st.altair_chart(plot2, use_container_width=False)
-
-
