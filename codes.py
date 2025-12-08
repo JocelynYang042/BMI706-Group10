@@ -682,7 +682,7 @@ else:
             st.warning("No diagnosis counts available for the selected substance-use category.")
             st.stop()
         subset["types_reported"] = subset["types_reported"].map(TYPE_MAP).fillna(subset["types_reported"])
-        brush = alt.selection_interval(encodings=['x'])
+        brush = alt.selection_interval(encodings=['x'], name="diag_brush")
         
         chart = alt.Chart(subset).mark_rect().encode(
             x=alt.X("types_reported:N", title="Mental health disorders"),
@@ -698,7 +698,12 @@ else:
         subset['pop'] = subset['SUB'].map(map_pop)
         subset['percentage'] = subset['mh']/subset['pop']
         chart_bar = alt.Chart(subset
-                            ).mark_bar().encode(x=alt.X("sum(percentage):Q",title = 'Sum of percentage'),
+                            ).mark_bar().encode(x=alt.X("sum(percentage):Q",title = 'Sum of percentage',
+                                                        scale=alt.Scale(
+                                                            domainMin=0,
+                                                            domainMax=alt.ExprRef("length(data('diag_brush_store')) ? null : 1"),
+                                                            clamp=True
+                                                        )),
                                                 y=alt.Y("SUB:N", title="substance-related disorders"),tooltip = [
                                                     alt.Tooltip("sum(percentage):Q", title="Sum of Percentage"),
                                                     alt.Tooltip("SUB:N", title="substance-related disorders")]).transform_filter(brush)
