@@ -3,66 +3,39 @@ import pandas as pd
 import streamlit as st
 from vega_datasets import data
 
+
 @st.cache_data
 def load_data():
     """
-    Load sample dataset from local file.
+    Load the dataset. Assumes the dataset is named MHCLD_PUF_2023_clean.csv in the same working directory. 
+    Download from Google Drive in links.txt.
     """
-    # Optimize data types to reduce memory
-    dtypes = {
-        'AGE': 'category',
-        'SEX': 'category',
-        'RACE': 'category',
-        'EMPLOY': 'category',
-        'LIVARAG': 'category',
-        'STATEFIP': 'category',
-        'STATEFIP_code': 'int8',
-        'TRAUSTREFLG': 'int8',
-        'ANXIETYFLG': 'int8',
-        'ADHDFLG': 'int8',
-        'CONDUCTFLG': 'int8',
-        'DELIRDEMFLG': 'int8',
-        'BIPOLARFLG': 'int8',
-        'DEPRESSFLG': 'int8',
-        'ODDFLG': 'int8',
-        'PDDFLG': 'int8',
-        'PERSONFLG': 'int8',
-        'SCHIZOFLG': 'int8',
-        'ALCSUBFLG': 'int8',
-        'OTHERDISFLG': 'int8',
-        'SPHSERVICE': 'int8',
-        'CMPSERVICE': 'int8',
-        'OPISERVICE': 'int8',
-        'RTCSERVICE': 'int8',
-        'IJSSERVICE': 'int8'
-    }
-    
-    # Load from local file (put your sample file in the repo)
-    df = pd.read_csv('MHCLD_PUF_2023_clean.csv', dtype=dtypes)
-    
-    # Add info banner
-    st.info(f"Displaying sample of {len(df):,} rows for visualization")
-    
-    df['SUB_dia'] = ['NO' if pd.isna(i) else 'YES' for i in df['SUB']]
-    df['STATEFIP_code_str'] = df['STATEFIP_code'].apply(
-        lambda x: f"{int(x):02d}" if pd.notnull(x) else None
-    )
+    df = pd.read_csv('MHCLD_PUF_2023_clean.csv')
+    df['SUB_dia'] = ['NO' if i else 'YES' for i in df['SUB'].isnull()]
     return df
-
 df = load_data()
 
-# create three tabs
-tab1, tab2, tab3 = st.tabs(["Diagnosed Mental Disorders", "Substance Use", "Mental Health Service"])
+# create two tabs (merged tab 1 and 3)
+tab1, tab2 = st.tabs(["Diagnosed Mental Disorders & Mental Health Service", "Substance Use"])
 
-# content for each tab
+# content for merged tab1
 with tab1:
-    st.header("Diagnosed Mental Disorders")
-    st.write("This section provides visualization related to the distribution of various diagnosed mental disorders across different demographic groups in the US population.")
+    st.header("Mental Health Statistics")
+    
+    # Add radio button to choose between diagnosis and service statistics
+    view_type = st.radio(
+        "Select Statistics Type",
+        options=["Diagnosed Mental Disorders", "Mental Health Service Use"],
+        horizontal=True
+    )
+    
+    if view_type == "Diagnosed Mental Disorders":
+        st.write("This section provides visualization related to the distribution of various diagnosed mental disorders across different demographic groups in the US population.")
+    else:
+        st.write("This section compares the number of mental health services received across the states.")
 
     subset = df.copy()
     
-
-
     st.write("### Select Demographic Groups")
 
     # ----- Age -----
@@ -124,208 +97,475 @@ with tab1:
     )
     subset = subset[subset["LIVARAG"].isin(selected_livarag)]
 
-    #st.subheader("Stacked Bar Charts by Selected Categories")
-    
-    diagnosis_cols = [col for col in subset.columns if col.endswith("FLG")]
-    long_df = subset.melt(
-        id_vars=["AGE", "RACE", "SEX", "EMPLOY", "LIVARAG", "STATEFIP", "STATEFIP_code", "STATEFIP_code_str"],
-        value_vars=diagnosis_cols,
-        var_name="Diagnosis",
-        value_name="HasCondition"
-    )
-    long_df = long_df[long_df["HasCondition"] == 1]
+    # ----- Conditional rendering based on view type -----
+    if view_type == "Diagnosed Mental Disorders":
+        # Original Tab 1 content
+        diagnosis_cols = [col for col in subset.columns if col.endswith("FLG")]
+        long_df = subset.melt(
+            id_vars=["AGE", "RACE", "SEX", "EMPLOY", "LIVARAG", "STATEFIP", "STATEFIP_code"],
+            value_vars=diagnosis_cols,
+            var_name="Diagnosis",
+            value_name="HasCondition"
+        )
+        long_df = long_df[long_df["HasCondition"] == 1]
 
-    FLAG_TO_NAME = {
-        "TRAUSTREFLG": "Trauma & Stressor Disorder",
-        "ANXIETYFLG": "Anxiety Disorder",
-        "ADHDFLG": "ADHD",
-        "CONDUCTFLG": "Conduct Disorder",
-        "DELIRDEMFLG": "Delirium / Dementia",
-        "BIPOLARFLG": "Bipolar Disorder",
-        "DEPRESSFLG": "Depression",
-        "ODDFLG": "Oppositional Defiant Disorder",
-        "PDDFLG": "Pervasive Developmental Disorder",
-        "PERSONFLG": "Personality Disorder",
-        "SCHIZOFLG": "Schizophrenia",
-        "ALCSUBFLG": "Alcohol Use Disorder",
-        "OTHERDISFLG": "Other Disorder"
-    }
-    # map the flags to names
-    long_df_copy = long_df.copy()
-    long_df_copy["Diagnosis"] = long_df_copy["Diagnosis"].map(FLAG_TO_NAME)
-   
-    # -----map-----
-    st.subheader("Geographical Distribution of Diagnosed Mental Disorders Across US States")
-    st.write("Select a mental disorder from the dropdown to visualize its distribution.")
-    selected_diagnosis = st.selectbox(
-        "Select Diagnosis",
-        options=long_df_copy["Diagnosis"].unique()
-    )
-    #data aggregation for plotting
-    agg_map = (
-        long_df_copy[long_df_copy["Diagnosis"] == selected_diagnosis]
-        .groupby(["STATEFIP", "STATEFIP_code_str", "Diagnosis"])
-        .size()
-        .reset_index(name="Count")
-    )
-    states = alt.topo_feature(data.us_10m.url, 'states')
-    background = alt.Chart(states).mark_geoshape(
-        fill='lightgray',
-        stroke='white'
-    ).project(
-        type='albersUsa'
-    ).properties(
-        width=600,
-        height=400
-    )   
-    map_chart = alt.Chart(states).mark_geoshape(  
+        FLAG_TO_NAME = {
+            "TRAUSTREFLG": "Trauma & Stressor Disorder",
+            "ANXIETYFLG": "Anxiety Disorder",
+            "ADHDFLG": "ADHD",
+            "CONDUCTFLG": "Conduct Disorder",
+            "DELIRDEMFLG": "Delirium / Dementia",
+            "BIPOLARFLG": "Bipolar Disorder",
+            "DEPRESSFLG": "Depression",
+            "ODDFLG": "Oppositional Defiant Disorder",
+            "PDDFLG": "Pervasive Developmental Disorder",
+            "PERSONFLG": "Personality Disorder",
+            "SCHIZOFLG": "Schizophrenia",
+            "ALCSUBFLG": "Alcohol Use Disorder",
+            "OTHERDISFLG": "Other Disorder"
+        }
+        
+        long_df_copy = long_df.copy()
+        long_df_copy["Diagnosis"] = long_df_copy["Diagnosis"].map(FLAG_TO_NAME)
+
+        # -----map-----
+        st.subheader("Geographical Distribution of Diagnosed Mental Disorders Across US States")
+        st.write("Select a mental disorder from the dropdown to visualize its distribution.")
+        selected_diagnosis = st.selectbox(
+            "Select Diagnosis",
+            options=long_df_copy["Diagnosis"].unique()
+        )
+
+        # Data aggregation for plotting
+        agg_map = long_df_copy[long_df_copy["Diagnosis"] == selected_diagnosis].groupby(["STATEFIP", "STATEFIP_code", "Diagnosis"]).size().reset_index(name="Count")
+        agg_map['STATEFIP_code'] = agg_map['STATEFIP_code'].astype(str)
+        states = alt.topo_feature(data.us_10m.url, 'states')
+
+        background = alt.Chart(states).mark_geoshape(
+            fill='lightgray',
+            stroke='white'
+        ).project(
+            type='albersUsa'
+        ).properties(
+            height=400
+        )   
+
+        map_chart = alt.Chart(states).mark_geoshape(  
             stroke='white',    
         ).encode(
-            color=alt.Color('Count:Q', scale=alt.Scale(type = 'log', scheme='blues'), title='Number of Diagnoses'),
+            color=alt.Color('Count:Q', scale=alt.Scale(type='log', scheme='blues'), title='Number of Diagnoses'),
             tooltip=[
                 alt.Tooltip('STATEFIP:N', title='State'),
                 alt.Tooltip('Count:Q', title='Number of Diagnoses')
             ]
         ).transform_lookup(
             lookup='id',
-            from_=alt.LookupData(agg_map, 'STATEFIP_code_str', ['STATEFIP', 'Count'])
+            from_=alt.LookupData(agg_map, 'STATEFIP_code', ['STATEFIP', 'Count'])
         ).project(
             type='albersUsa'   
         ).properties(
-            width=600,
             height=400
         )
-    final_chart = (background + map_chart).properties(
-        title=f'Geographical Distribution of {selected_diagnosis} Diagnoses Across US States'
-    )
-    st.altair_chart(final_chart, use_container_width=True)
 
-    # ----- stacked bar charts -----
-    st.subheader("Stacked Bar Charts by Selected Categories")
+        final_chart = (background + map_chart).properties(
+            title=f'Geographical Distribution of {selected_diagnosis} Diagnoses Across US States',
+            height=400
+        )
 
-    # ----- Sex -----
-    agg = (
+        st.markdown("""
+        <style>
+            iframe[title="streamlit_extras.chart"] {
+                display: block;
+                margin-left: auto;
+                margin-right: auto;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+
+        st.altair_chart(final_chart, use_container_width=True)
+
+        # ----- stacked bar charts -----
+        st.subheader("Stacked Bar Charts by Selected Categories")
+
+        # ----- Sex -----
+        agg = (
             long_df.groupby(["Diagnosis", "SEX"])
             .size()
             .reset_index(name="Count")
         )
-    agg["Diagnosis"] = agg["Diagnosis"].map(FLAG_TO_NAME)
-    st.altair_chart(
-        (
-            alt.Chart(agg)
-            .mark_bar()
-            .encode(
-                y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
-                x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color(f'{"SEX"}:N', title="Sex"),
-                tooltip=["Diagnosis:N", f'{"SEX"}:N', "Count:Q"]
-            )
-            .properties(
-                title="Diagnosis Stacked by Sex"
-            )
-        ),
-        use_container_width=True
-    )
+        agg["Diagnosis"] = agg["Diagnosis"].map(FLAG_TO_NAME)
+        sex_selection = alt.selection_point(fields=["SEX"], bind="legend")
+        st.altair_chart(
+            (
+                alt.Chart(agg)
+                .mark_bar()
+                .encode(
+                    y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
+                    x=alt.X("Count:Q", title="Number of Diagnoses"),
+                    color=alt.Color("SEX:N", title="Sex", legend=alt.Legend(labelLimit=0)),
+                    tooltip=["Diagnosis:N", "SEX:N", "Count:Q"],
+                    opacity=alt.condition(sex_selection, alt.value(1), alt.value(0.2))
+                )
+                .add_params(sex_selection)
+                .properties(
+                    title="Diagnosis Stacked by Sex"
+                )
+            ),
+            use_container_width=True
+        )
 
-    # ----- Age -----
-    agg = (
+        # ----- Age -----
+        agg = (
             long_df.groupby(["Diagnosis", "AGE"])
             .size()
             .reset_index(name="Count")
         )
-    agg["Diagnosis"] = agg["Diagnosis"].map(FLAG_TO_NAME)
-    st.altair_chart(
-        (
-            alt.Chart(agg)
-            .mark_bar()
-            .encode(
-                y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
-                x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color(f'{"AGE"}:N', title="Age", scale=alt.Scale(scheme="blues")),
-                tooltip=["Diagnosis:N", f'{"AGE"}:N', "Count:Q"]
-            )
-            .properties(
-                title="Diagnosis Stacked by Age"
-            )
-        ),
-        use_container_width=True
-    )
+        agg["Diagnosis"] = agg["Diagnosis"].map(FLAG_TO_NAME)
+        age_selection = alt.selection_point(fields=["AGE"], bind="legend")
+        st.altair_chart(
+            (
+                alt.Chart(agg)
+                .mark_bar()
+                .encode(
+                    y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
+                    x=alt.X("Count:Q", title="Number of Diagnoses"),
+                    color=alt.Color("AGE:N", title="Age", scale=alt.Scale(scheme="blues"), legend=alt.Legend(labelLimit=0)),
+                    tooltip=["Diagnosis:N", "AGE:N", "Count:Q"],
+                    opacity=alt.condition(age_selection, alt.value(1), alt.value(0.2))
+                )
+                .add_params(age_selection)
+                .properties(
+                    title="Diagnosis Stacked by Age"
+                )
+            ),
+            use_container_width=True
+        )
 
-    # ----- Race -----
-    agg = (
+        # ----- Race -----
+        agg = (
             long_df.groupby(["Diagnosis", "RACE"])
             .size()
             .reset_index(name="Count")
         )
-    agg["Diagnosis"] = agg["Diagnosis"].map(FLAG_TO_NAME)
-    st.altair_chart(
-        (
-            alt.Chart(agg)
-            .mark_bar()
-            .encode(
-                y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
-                x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color(f'{"RACE"}:N', title="Race"),
-                tooltip=["Diagnosis:N", f'{"RACE"}:N', "Count:Q"]
-            )
-            .properties(
-                title="Diagnosis Stacked by Race"
-            )
-        ),
-        use_container_width=True
-    )
+        agg["Diagnosis"] = agg["Diagnosis"].map(FLAG_TO_NAME)
+        race_selection = alt.selection_point(fields=["RACE"], bind="legend")
+        st.altair_chart(
+            (
+                alt.Chart(agg)
+                .mark_bar()
+                .encode(
+                    y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
+                    x=alt.X("Count:Q", title="Number of Diagnoses"),
+                    color=alt.Color("RACE:N", title="Race", legend=alt.Legend(labelLimit=0)),
+                    tooltip=["Diagnosis:N", "RACE:N", "Count:Q"],
+                    opacity=alt.condition(race_selection, alt.value(1), alt.value(0.2))
+                )
+                .add_params(race_selection)
+                .properties(
+                    title="Diagnosis Stacked by Race"
+                )
+            ),
+            use_container_width=True
+        )
 
-    # ----- Social-econ status -----
-    agg = (
+        # ----- Social-econ status -----
+        agg = (
             long_df.groupby(["Diagnosis", "EMPLOY"])
             .size()
             .reset_index(name="Count")
         )
-    agg["Diagnosis"] = agg["Diagnosis"].map(FLAG_TO_NAME)
-    st.altair_chart(
-        (
-            alt.Chart(agg)
-            .mark_bar()
-            .encode(
-                y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
-                x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color(f'{"EMPLOY"}:N', title="Social-Economic Status"),
-                tooltip=["Diagnosis:N", f'{"EMPLOY"}:N', "Count:Q"]
-            )
-            .properties(
-                title="Diagnosis Stacked by Social-Economic Status (EMPLOY)"
-            )
-        ),
-        use_container_width=True
-    )
+        agg["Diagnosis"] = agg["Diagnosis"].map(FLAG_TO_NAME)
+        employ_selection = alt.selection_point(fields=["EMPLOY"], bind="legend")
+        st.altair_chart(
+            (
+                alt.Chart(agg)
+                .mark_bar()
+                .encode(
+                    y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
+                    x=alt.X("Count:Q", title="Number of Diagnoses"),
+                    color=alt.Color("EMPLOY:N", title="Social-Economic Status", legend=alt.Legend(labelLimit=0)),
+                    tooltip=["Diagnosis:N", "EMPLOY:N", "Count:Q"],
+                    opacity=alt.condition(employ_selection, alt.value(1), alt.value(0.2))
+                )
+                .add_params(employ_selection)
+                .properties(
+                    title="Diagnosis Stacked by Social-Economic Status (EMPLOY)"
+                )
+            ),
+            use_container_width=True
+        )
 
-    # ----- Living status -----
-    agg = (
+        # ----- Living status -----
+        agg = (
             long_df.groupby(["Diagnosis", "LIVARAG"])
             .size()
             .reset_index(name="Count")
         )
-    agg["Diagnosis"] = agg["Diagnosis"].map(FLAG_TO_NAME)
-    st.altair_chart(
-        (
-            alt.Chart(agg)
-            .mark_bar()
-            .encode(
-                y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
-                x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color(f'{"LIVARAG"}:N', title="Living Status"),
-                tooltip=["Diagnosis:N", f'{"LIVARAG"}:N', "Count:Q"]
-            )
-            .properties(
-                title="Diagnosis Stacked by Living Status (LIVARAG)"
-            )
-        ),
-        use_container_width=True
-    )
+        agg["Diagnosis"] = agg["Diagnosis"].map(FLAG_TO_NAME)
+        livarag_selection = alt.selection_point(fields=["LIVARAG"], bind="legend")
+        st.altair_chart(
+            (
+                alt.Chart(agg)
+                .mark_bar()
+                .encode(
+                    y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
+                    x=alt.X("Count:Q", title="Number of Diagnoses"),
+                    color=alt.Color("LIVARAG:N", title="Living Status", legend=alt.Legend(labelLimit=0)),
+                    tooltip=["Diagnosis:N", "LIVARAG:N", "Count:Q"],
+                    opacity=alt.condition(livarag_selection, alt.value(1), alt.value(0.2))
+                )
+                .add_params(livarag_selection)
+                .properties(
+                    title="Diagnosis Stacked by Living Status (LIVARAG)"
+                )
+            ),
+            use_container_width=True
+        )
+
+    else:  # Mental Health Service Use
+        # Original Tab 3 content
+        service_cols = ["SPHSERVICE", "CMPSERVICE", "OPISERVICE", "RTCSERVICE", "IJSSERVICE"]
+        long_df = subset.melt(
+            id_vars=["AGE", "RACE", "SEX", "EMPLOY", "LIVARAG", "STATEFIP", "STATEFIP_code"],
+            value_vars=service_cols,
+            var_name="Service",
+            value_name="HasService"
+        )
+        
+        long_df = long_df[long_df["HasService"] == 1]
+        
+        SERVICE_TO_NAME = {
+            "SPHSERVICE": "State Psychiatric Hospital Services",
+            "CMPSERVICE": "SMHA-funded/operated Community-based Program",
+            "OPISERVICE": "Other Psychiatric Inpatient",
+            "RTCSERVICE": "Residential Treatment Center",
+            "IJSSERVICE": "Institutions Under The Justice System"
+        }
+        
+        long_df_copy = long_df.copy()
+        long_df_copy["Service"] = long_df_copy["Service"].map(SERVICE_TO_NAME)
+        
+        # -----map-----
+        st.subheader("Geographical Distribution of Mental Health Service Use Across US States")
+        st.write("Select a mental health service type from the dropdown to visualize its distribution.")
+        selected_service = st.selectbox(
+            "Select Service",
+            options=long_df_copy["Service"].unique()
+        )
+        
+        # Data aggregation for plotting
+        agg_map = long_df_copy[long_df_copy["Service"] == selected_service].groupby(["STATEFIP", "STATEFIP_code", "Service"]).size().reset_index(name="Count")
+        agg_map['STATEFIP_code'] = agg_map['STATEFIP_code'].astype(str)
+        
+        states = alt.topo_feature(data.us_10m.url, 'states')
+
+        background = alt.Chart(states).mark_geoshape(
+            fill='lightgray',
+            stroke='white'
+        ).project(
+            type='albersUsa'
+        ).properties(
+            height=400
+        )
+        
+        map_chart = alt.Chart(states).mark_geoshape(  
+            stroke='white'     
+        ).encode(
+            color=alt.Color('Count:Q', scale=alt.Scale(type='log', scheme='greens'), title='Number of Service Uses'),
+            tooltip=[
+                alt.Tooltip('STATEFIP:N', title='State'),
+                alt.Tooltip('Count:Q', title='Number of Service Uses'),
+            ]
+        ).transform_lookup(
+            lookup='id',
+            from_=alt.LookupData(agg_map, 'STATEFIP_code', ['STATEFIP', 'Count'])
+        ).project(
+            type='albersUsa'   
+        ).properties(
+            height=400
+        )
+        
+        final_chart = (background + map_chart).properties(
+            title=f'Geographical Distribution of {selected_service} Across US States',
+            height=400
+        )
+        
+        st.altair_chart(final_chart, use_container_width=True)
+        
+        # ----- stacked bar charts -----
+        st.subheader("Stacked Bar Charts by Selected Categories")
+
+        # ----- Sex -----
+        agg = (
+            long_df.groupby(["Service", "SEX"])
+            .size()
+            .reset_index(name="Count")
+        )
+        agg["Service"] = agg["Service"].map(SERVICE_TO_NAME)
+        service_sex_selection = alt.selection_point(fields=["SEX"], bind="legend")
+        st.altair_chart(
+            (
+                alt.Chart(agg)
+                .mark_bar()
+                .encode(
+                    y=alt.Y(
+                        "Service:N",
+                        title="Service Type",
+                        axis=alt.Axis(labelLimit=300, labelPadding=10, titlePadding=80)
+                    ),
+                    x=alt.X("Count:Q", title="Number of Service Uses"),
+                    color=alt.Color("SEX:N", title="Sex", legend=alt.Legend(labelLimit=0)),
+                    tooltip=["Service:N", "SEX:N", "Count:Q"],
+                    opacity=alt.condition(service_sex_selection, alt.value(1), alt.value(0.2))
+                )
+                .add_params(service_sex_selection)
+                .properties(
+                    title="Service Use Stacked by Sex",
+                    width=800
+                )
+            ),
+            use_container_width=False
+        )
+
+        # ----- Age -----
+        agg = (
+            long_df.groupby(["Service", "AGE"])
+            .size()
+            .reset_index(name="Count")
+        )
+        agg["Service"] = agg["Service"].map(SERVICE_TO_NAME)
+        service_age_selection = alt.selection_point(fields=["AGE"], bind="legend")
+        st.altair_chart(
+            (
+                alt.Chart(agg)
+                .mark_bar()
+                .encode(
+                    y=alt.Y(
+                        "Service:N",
+                        title="Service Type",
+                        axis=alt.Axis(labelLimit=300, labelPadding=10, titlePadding=80)
+                    ),
+                    x=alt.X("Count:Q", title="Number of Service Uses"),
+                    color=alt.Color(
+                        "AGE:N",
+                        title="Age",
+                        scale=alt.Scale(scheme="blues"),
+                        legend=alt.Legend(labelLimit=0)
+                    ),
+                    tooltip=["Service:N", "AGE:N", "Count:Q"],
+                    opacity=alt.condition(service_age_selection, alt.value(1), alt.value(0.2))
+                )
+                .add_params(service_age_selection)
+                .properties(
+                    title="Service Use Stacked by Age",
+                    width=800
+                )
+            ),
+            use_container_width=False
+        )
+
+        # ----- Race -----
+        agg = (
+            long_df.groupby(["Service", "RACE"])
+            .size()
+            .reset_index(name="Count")
+        )
+        agg["Service"] = agg["Service"].map(SERVICE_TO_NAME)
+        service_race_selection = alt.selection_point(fields=["RACE"], bind="legend")
+        st.altair_chart(
+            (
+                alt.Chart(agg)
+                .mark_bar()
+                .encode(
+                    y=alt.Y(
+                        "Service:N",
+                        title="Service Type",
+                        axis=alt.Axis(labelLimit=300, labelPadding=10, titlePadding=80)
+                    ),
+                    x=alt.X("Count:Q", title="Number of Service Uses"),
+                    color=alt.Color("RACE:N", title="Race", legend=alt.Legend(labelLimit=0)),
+                    tooltip=["Service:N", "RACE:N", "Count:Q"],
+                    opacity=alt.condition(service_race_selection, alt.value(1), alt.value(0.2))
+                )
+                .add_params(service_race_selection)
+                .properties(
+                    title="Service Use Stacked by Race",
+                    width=800
+                )
+            ),
+            use_container_width=False
+        )
+
+        # ----- Social-econ status -----
+        agg = (
+            long_df.groupby(["Service", "EMPLOY"])
+            .size()
+            .reset_index(name="Count")
+        )
+        agg["Service"] = agg["Service"].map(SERVICE_TO_NAME)
+        service_employ_selection = alt.selection_point(fields=["EMPLOY"], bind="legend")
+        st.altair_chart(
+            (
+                alt.Chart(agg)
+                .mark_bar()
+                .encode(
+                    y=alt.Y(
+                        "Service:N",
+                        title="Service Type",
+                        axis=alt.Axis(labelLimit=300, labelPadding=10, titlePadding=80)
+                    ),
+                    x=alt.X("Count:Q", title="Number of Service Uses"),
+                    color=alt.Color(
+                        "EMPLOY:N",
+                        title="Social-Economic Status",
+                        legend=alt.Legend(labelLimit=0)
+                    ),
+                    tooltip=["Service:N", "EMPLOY:N", "Count:Q"],
+                    opacity=alt.condition(service_employ_selection, alt.value(1), alt.value(0.2))
+                )
+                .add_params(service_employ_selection)
+                .properties(
+                    title="Service Use Stacked by Social-Economic Status (EMPLOY)",
+                    width=800
+                )
+            ),
+            use_container_width=False
+        )
+
+        # ----- Living status -----
+        agg = (
+            long_df.groupby(["Service", "LIVARAG"])
+            .size()
+            .reset_index(name="Count")
+        )
+        agg["Service"] = agg["Service"].map(SERVICE_TO_NAME)
+        service_livarag_selection = alt.selection_point(fields=["LIVARAG"], bind="legend")
+        st.altair_chart(
+            (
+                alt.Chart(agg)
+                .mark_bar()
+                .encode(
+                    y=alt.Y(
+                        "Service:N",
+                        title="Service Type",
+                        axis=alt.Axis(labelLimit=300, labelPadding=10, titlePadding=80)
+                    ),
+                    x=alt.X("Count:Q", title="Number of Service Uses"),
+                    color=alt.Color("LIVARAG:N", title="Living Status", legend=alt.Legend(labelLimit=0)),
+                    tooltip=["Service:N", "LIVARAG:N", "Count:Q"],
+                    opacity=alt.condition(service_livarag_selection, alt.value(1), alt.value(0.2))
+                )
+                .add_params(service_livarag_selection)
+                .properties(
+                    title="Service Use Stacked by Living Status (LIVARAG)",
+                    width=800
+                )
+            ),
+            use_container_width=False
+        )
 
 
-
-
+# Tab 2 - Substance Use (unchanged)
 with tab2:
     st.header("Substance Use")
 
@@ -468,80 +708,3 @@ with tab2:
         plot2 = plot2.configure_title(fontSize = 15, anchor = 'middle')
 
         st.altair_chart(plot2, use_container_width=False)
-
-
-
-
-
-with tab3:
-    st.header("Mental Health Service")
-    st.write("This section compares the rate of mental health service received across the states.")
-    
-   #---Distribution Map---
-    service_cols = ["SPHSERVICE", "CMPSERVICE", "OPISERVICE", "RTCSERVICE", "IJSSERVICE"]
-    tab3_long_df = df.melt(
-        id_vars=["STATEFIP_code", "STATEFIP_code_str", "STATEFIP"],
-        value_vars=service_cols,
-        var_name="Service",
-        value_name="HasService"
-    )
-    total_patients_num_state = (
-        df.groupby(["STATEFIP", "STATEFIP_code_str"])
-        .size()
-        .reset_index(name="TotalPatients")
-    )
-    tab3_long_df = tab3_long_df[tab3_long_df["HasService"] == 1]
-    service_name = {
-        "SPHSERVICE": "State Psychiatric Hospital Services",
-        "CMPSERVICE": "SMHA-funded/operated Community-based Program",
-        "OPISERVICE": "Other Psychiatric Inpatient",
-        "RTCSERVICE": "Residential Treatment Center",
-        "IJSSERVICE": "Institutions Under The Justice System"
-    }
-    tab3_long_df["Service"] = tab3_long_df["Service"].map(service_name)
-    st.write("Select Mental Health Service Type")
-    selected_service = st.selectbox(
-        "Select Service",
-        options=tab3_long_df["Service"].unique()
-    )
-    tab3_agg_map = (
-        tab3_long_df[tab3_long_df["Service"] == selected_service]
-        .groupby(["STATEFIP", "STATEFIP_code_str", "Service"])
-        .size()
-        .reset_index(name="Count")
-    )
-    tab3_agg_map = tab3_agg_map.merge(total_patients_num_state, on=["STATEFIP", "STATEFIP_code_str"])
-    tab3_agg_map["Rate"] = tab3_agg_map["Count"] / tab3_agg_map["TotalPatients"]
-    st.write("Example data used for plotting:")
-    st.write(tab3_agg_map.head())
-    states = alt.topo_feature(data.us_10m.url, 'states')
-    background_tab3 = alt.Chart(states).mark_geoshape(
-        fill='lightgray',
-        stroke='white'
-    ).project(
-        type='albersUsa'
-    ).properties(
-        width=600,
-        height=400
-    )
-    map_chart_tab3 = alt.Chart(states).mark_geoshape(  
-            stroke='white'     
-        ).encode(
-            color=alt.Color('Rate:Q', scale=alt.Scale(type = 'log', scheme='greens'), title='Rate of Service Received'),
-            tooltip=[
-                alt.Tooltip('STATEFIP:N', title='State'),
-                alt.Tooltip('Rate:Q', title='Rate of Service Received'),
-            ]
-        ).transform_lookup(
-            lookup='id',
-            from_=alt.LookupData(tab3_agg_map, 'STATEFIP_code_str', ['STATEFIP', 'Rate'])
-        ).project(
-            type='albersUsa'   
-        ).properties(
-            width=600,
-            height=400
-        )
-    final_chart_tab3 = (background_tab3 + map_chart_tab3).properties(
-        title=f'Geographical Distribution of Rate of {selected_service} Received Across US States'
-    )
-    st.altair_chart(final_chart_tab3, use_container_width=True)
