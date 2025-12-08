@@ -2,7 +2,6 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 from vega_datasets import data
-import gdown
 
 @st.cache_data
 def load_data():
@@ -38,7 +37,7 @@ def load_data():
     }
     
     # Load from local file (put your sample file in the repo)
-    df = pd.read_csv('MHCLD_sample.csv', dtype=dtypes)
+    df = pd.read_csv('MHCLD_PUF_2023_clean.csv', dtype=dtypes)
     
     # Add info banner
     st.info(f"Displaying sample of {len(df):,} rows for visualization")
@@ -120,14 +119,6 @@ with tab1:
         default=livarag_options,
     )
     subset = subset[subset["LIVARAG"].isin(selected_livarag)]
-
-    # ===== Debug / preview =====
-    st.markdown("###Data Preview")
-    #for col in ["AGE", "SEX", "RACE", "EMPLOY", "LIVARAG"]:
-        #st.write(f"col {col}, unique values are {subset[col].unique()}")
-    #st.write(subset.head())
-
-
 
     #st.subheader("Stacked Bar Charts by Selected Categories")
     
