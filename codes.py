@@ -16,6 +16,7 @@ def load_data():
         'EMPLOY': 'category',
         'LIVARAG': 'category',
         'STATEFIP': 'category',
+        'STATEFIP_code': 'int8',
         'TRAUSTREFLG': 'int8',
         'ANXIETYFLG': 'int8',
         'ADHDFLG': 'int8',
@@ -43,6 +44,9 @@ def load_data():
     st.info(f"Displaying sample of {len(df):,} rows for visualization")
     
     df['SUB_dia'] = ['NO' if pd.isna(i) else 'YES' for i in df['SUB']]
+    df['STATEFIP_code_str'] = df['STATEFIP_code'].apply(
+        lambda x: f"{int(x):02d}" if pd.notnull(x) else None
+    )
     return df
 
 df = load_data()
@@ -124,7 +128,7 @@ with tab1:
     
     diagnosis_cols = [col for col in subset.columns if col.endswith("FLG")]
     long_df = subset.melt(
-        id_vars=["AGE", "RACE", "SEX", "EMPLOY", "LIVARAG", "STATEFIP", "STATEFIP_code"],
+        id_vars=["AGE", "RACE", "SEX", "EMPLOY", "LIVARAG", "STATEFIP", "STATEFIP_code", "STATEFIP_code_str"],
         value_vars=diagnosis_cols,
         var_name="Diagnosis",
         value_name="HasCondition"
@@ -149,7 +153,6 @@ with tab1:
     # map the flags to names
     long_df_copy = long_df.copy()
     long_df_copy["Diagnosis"] = long_df_copy["Diagnosis"].map(FLAG_TO_NAME)
-    st.write(long_df_copy.head())
    
     # -----map-----
     st.subheader("Geographical Distribution of Diagnosed Mental Disorders Across US States")
@@ -159,8 +162,12 @@ with tab1:
         options=long_df_copy["Diagnosis"].unique()
     )
     #data aggregation for plotting
-    agg_map = long_df_copy[long_df_copy["Diagnosis"] == selected_diagnosis].groupby(["STATEFIP", "STATEFIP_code", "Diagnosis"]).size().reset_index(name="Count")
-    agg_map['STATEFIP_code'] = agg_map['STATEFIP_code'].astype(str)
+    agg_map = (
+        long_df_copy[long_df_copy["Diagnosis"] == selected_diagnosis]
+        .groupby(["STATEFIP", "STATEFIP_code_str", "Diagnosis"])
+        .size()
+        .reset_index(name="Count")
+    )
     states = alt.topo_feature(data.us_10m.url, 'states')
     background = alt.Chart(states).mark_geoshape(
         fill='lightgray',
@@ -181,7 +188,7 @@ with tab1:
             ]
         ).transform_lookup(
             lookup='id',
-            from_=alt.LookupData(agg_map, 'STATEFIP_code', ['STATEFIP', 'Count'])
+            from_=alt.LookupData(agg_map, 'STATEFIP_code_str', ['STATEFIP', 'Count'])
         ).project(
             type='albersUsa'   
         ).properties(
@@ -473,12 +480,16 @@ with tab3:
    #---Distribution Map---
     service_cols = ["SPHSERVICE", "CMPSERVICE", "OPISERVICE", "RTCSERVICE", "IJSSERVICE"]
     tab3_long_df = df.melt(
-        id_vars=["STATEFIP_code","STATEFIP"],
+        id_vars=["STATEFIP_code", "STATEFIP_code_str", "STATEFIP"],
         value_vars=service_cols,
         var_name="Service",
         value_name="HasService"
     )
-    total_patients_num_state = df.groupby(["STATEFIP", "STATEFIP_code"]).size().reset_index(name="TotalPatients")
+    total_patients_num_state = (
+        df.groupby(["STATEFIP", "STATEFIP_code_str"])
+        .size()
+        .reset_index(name="TotalPatients")
+    )
     tab3_long_df = tab3_long_df[tab3_long_df["HasService"] == 1]
     service_name = {
         "SPHSERVICE": "State Psychiatric Hospital Services",
@@ -493,10 +504,14 @@ with tab3:
         "Select Service",
         options=tab3_long_df["Service"].unique()
     )
-    tab3_agg_map = tab3_long_df[tab3_long_df["Service"] == selected_service].groupby(["STATEFIP", "STATEFIP_code", "Service"]).size().reset_index(name="Count")
-    tab3_agg_map = tab3_agg_map.merge(total_patients_num_state, on=["STATEFIP", "STATEFIP_code"])
+    tab3_agg_map = (
+        tab3_long_df[tab3_long_df["Service"] == selected_service]
+        .groupby(["STATEFIP", "STATEFIP_code_str", "Service"])
+        .size()
+        .reset_index(name="Count")
+    )
+    tab3_agg_map = tab3_agg_map.merge(total_patients_num_state, on=["STATEFIP", "STATEFIP_code_str"])
     tab3_agg_map["Rate"] = tab3_agg_map["Count"] / tab3_agg_map["TotalPatients"]
-    tab3_agg_map['STATEFIP_code'] = tab3_agg_map['STATEFIP_code'].astype(str)
     st.write("Example data used for plotting:")
     st.write(tab3_agg_map.head())
     states = alt.topo_feature(data.us_10m.url, 'states')
@@ -519,7 +534,7 @@ with tab3:
             ]
         ).transform_lookup(
             lookup='id',
-            from_=alt.LookupData(tab3_agg_map, 'STATEFIP_code', ['STATEFIP', 'Rate'])
+            from_=alt.LookupData(tab3_agg_map, 'STATEFIP_code_str', ['STATEFIP', 'Rate'])
         ).project(
             type='albersUsa'   
         ).properties(
