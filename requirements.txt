@@ -1,5 +1,0 @@
-streamlit
-pandas
-altair
-vega-datasets
-gdown
