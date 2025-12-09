@@ -756,14 +756,14 @@ else:
         brush = alt.selection_interval(encodings=['x'], name="diag_brush")
         
         chart = alt.Chart(subset).mark_rect().encode(
-            x=alt.X("types_reported:N", title="Mental health disorders"),
-            y=alt.Y("SUB:N", title="Substance-related disorders"),
+            x=alt.X("types_reported:N", title="Mental health disorders",axis=alt.Axis(labelLimit=300)),
+            y=alt.Y("SUB:N", title="Substance-related disorders",axis=alt.Axis(labelLimit=300)),
             color=alt.Color("mh:Q", scale=alt.Scale(type='log', clamp=True), legend=alt.Legend(title='log(count)')),
             tooltip=[
                 alt.Tooltip("mh:Q", title="count"),
                 alt.Tooltip("SUB", title="Substance disorders"),
                 alt.Tooltip("types_reported", title="Mental health disorders")
-                ],).properties(width=600).add_params(brush)
+                ],).properties(width=500).add_params(brush)
         t = subset.groupby(["SUB"])['mh'].sum()
         map_pop = dict(zip(t.index.values, t.values))
         subset['pop'] = subset['SUB'].map(map_pop)
@@ -775,7 +775,7 @@ else:
                                                             domainMax=alt.ExprRef("length(data('diag_brush_store')) ? null : 1"),
                                                             clamp=True
                                                         )),
-                                                y=alt.Y("SUB:N", title="substance-related disorders"),tooltip = [
+                                                y=alt.Y("SUB:N", title="substance-related disorders",axis=alt.Axis(labelLimit=300)),tooltip = [
                                                     alt.Tooltip("sum(percentage):Q", title="Sum of Percentage"),
                                                     alt.Tooltip("SUB:N", title="substance-related disorders")]).transform_filter(brush)
         combine_c = alt.vconcat(chart, chart_bar)
@@ -800,11 +800,14 @@ else:
         SAP_map = {'1.0':'problem','0.0':'no problem','missing': 'missing'}
         subset['SAP'] = subset['SAP'].map(SAP_map).fillna(subset['SAP'])
         subset['types_reported'] = subset['types_reported'].map(TYPE_MAP).fillna(subset['types_reported'])
-        plot2 = alt.Chart(subset).mark_bar().encode(x = alt.X('SAP:N') , 
-                                                y = alt.Y('mh:Q',
+        sap_selection = alt.selection_point(fields=["SAP"], bind="legend")
+        plot2 = alt.Chart(subset).mark_bar().encode(y = alt.Y('types_reported:N',axis=alt.Axis(labelLimit=300, labelPadding=10, titlePadding=80)) , 
+                                                x = alt.X('mh:Q',
                                                             scale = alt.Scale(type = 'sqrt')).title('count of the mental health disorders'), 
-                                                            color = alt.Color("SAP:N"),facet = alt.Column('types_reported:N',columns = 4 ).title('mental health disorders type')).properties( height = 400, 
-                                                            width = 100,
-                                                            title = 'Distribution of total count of mental health across types and substances use problem(SAP)')
-        plot2 = plot2.configure_title(fontSize = 15, anchor = 'middle')
-        st.altair_chart(plot2, use_container_width=False)
+                                                            color = alt.Color("SAP:N",legend=alt.Legend(labelLimit=0)),
+                                                            opacity=alt.condition(sap_selection, alt.value(1), alt.value(0.2))
+                                                            ).properties( height = 500, 
+                                                            width = 250,
+                                                            title = 'Distribution of total count of mental health across types and substances use problem(SAP)').add_params(sap_selection)
+        #plot2 = plot2.configure_title(fontSize = 15, anchor = 'middle')
+        st.altair_chart(plot2, use_container_width=True)
