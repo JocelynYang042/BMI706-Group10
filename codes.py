@@ -321,7 +321,7 @@ if view_type == "Diagnosed Mental Disorders":
             .encode(
                 y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
                 x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color("SEX:N", title="Sex", legend=alt.Legend(labelLimit=0), domain=["Female", "Male", "Missing"], range=["#e78ac3", "#8da0cb", "#e41a1c"]),
+                color=alt.Color("SEX:N", title="Sex", legend=alt.Legend(labelLimit=0), scale = alt.Scale(domain=["Female", "Male", "Missing"], range=["#e78ac3", "#8da0cb", "#e41a1c"])),
                 tooltip=["Diagnosis:N", "SEX:N", "Count:Q"],
                 opacity=alt.condition(sex_selection, alt.value(1), alt.value(0.2))
             )
