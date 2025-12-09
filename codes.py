@@ -810,6 +810,7 @@ else:
         map_pop = dict(zip(t.index.values, t.values))
         subset['pop'] = subset['SUB'].map(map_pop)
         subset['percentage'] = subset['mh']/subset['pop']
+        st.write("Please select columns from the matrix above by dragging to see the corresponding sum of percentage in the barplot below.")
         chart_bar = alt.Chart(subset
                             ).mark_bar().encode(x=alt.X("sum(percentage):Q",title = 'Sum of percentage',
                                                         scale=alt.Scale(
