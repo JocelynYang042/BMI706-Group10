@@ -378,7 +378,7 @@ if view_type == "Diagnosed Mental Disorders":
             .encode(
                 y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
                 x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color("RACE:N", title="Race", legend=alt.Legend(labelLimit=0)),
+                color=alt.Color("RACE:N", title="Race", legend=alt.Legend(labelLimit=0), scale = alt.Scale(scheme='set3')),
                 tooltip=["Diagnosis:N", "RACE:N", "Count:Q"],
                 opacity=alt.condition(race_selection, alt.value(1), alt.value(0.2))
             )
@@ -404,7 +404,7 @@ if view_type == "Diagnosed Mental Disorders":
             .encode(
                 y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
                 x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color("EMPLOY:N", title="Social-Economic Status", legend=alt.Legend(labelLimit=0)),
+                color=alt.Color("EMPLOY:N", title="Social-Economic Status", legend=alt.Legend(labelLimit=0), scale = alt.Scale(scheme='tableau10')),
                 tooltip=["Diagnosis:N", "EMPLOY:N", "Count:Q"],
                 opacity=alt.condition(employ_selection, alt.value(1), alt.value(0.2))
             )
@@ -430,7 +430,7 @@ if view_type == "Diagnosed Mental Disorders":
             .encode(
                 y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
                 x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color("LIVARAG:N", title="Living Status", legend=alt.Legend(labelLimit=0)),
+                color=alt.Color("LIVARAG:N", title="Living Status", legend=alt.Legend(labelLimit=0), scale = alt.Scale(scheme='set2')),
                 tooltip=["Diagnosis:N", "LIVARAG:N", "Count:Q"],
                 opacity=alt.condition(livarag_selection, alt.value(1), alt.value(0.2))
             )
