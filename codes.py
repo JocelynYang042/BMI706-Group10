@@ -577,8 +577,7 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
             )
             .add_params(service_sex_selection)
             .properties(
-                title="Service Use Stacked by Sex",
-                width=800
+                title="Service Use Stacked by Sex"
             )
         ),
         use_container_width=False
