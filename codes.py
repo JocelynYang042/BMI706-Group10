@@ -385,7 +385,7 @@ if view_type == "Diagnosed Mental Disorders":
             .add_params(race_selection)
             .properties(
                 title="Diagnosis Stacked by Race",
-                width=2000
+                width=5000
             )
         ),
         use_container_width=True
