@@ -2,6 +2,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 from pathlib import Path
+from typing import Optional
 from vega_datasets import data
 
 BASE_PATH = Path(__file__).resolve().parent
@@ -48,6 +49,21 @@ TYPE_MAP = FLAG_TO_NAME
 
 
 FILTER_COLUMNS = ["RACE", "SEX", "EMPLOY", "LIVARAG"]
+
+
+def horizontal_legend(title: str, columns: Optional[int] = 3) -> alt.Legend:
+    """Place legends below charts so long labels do not squeeze the plotting area."""
+    legend_config = {
+        "title": title,
+        "orient": "bottom",
+        "direction": "horizontal",
+        "labelLimit": 0,
+        "titleAnchor": "start",
+        "labelPadding": 8,
+    }
+    if columns is not None:
+        legend_config["columns"] = columns
+    return alt.Legend(**legend_config)
 
 
 @st.cache_data
@@ -321,7 +337,11 @@ if view_type == "Diagnosed Mental Disorders":
             .encode(
                 y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
                 x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color("SEX:N", title="Sex", legend=alt.Legend(labelLimit=0), scale = alt.Scale(domain=["Female", "Male", "Missing"], range=["#e78ac3", "#8da0cb", "#e41a1c"])),
+                color=alt.Color(
+                    "SEX:N",
+                    legend=horizontal_legend("Sex"),
+                    scale=alt.Scale(domain=["Female", "Male", "Missing"], range=["#e78ac3", "#8da0cb", "#e41a1c"]),
+                ),
                 tooltip=["Diagnosis:N", "SEX:N", "Count:Q"],
                 opacity=alt.condition(sex_selection, alt.value(1), alt.value(0.2))
             )
@@ -349,9 +369,8 @@ if view_type == "Diagnosed Mental Disorders":
                 x=alt.X("Count:Q", title="Number of Diagnoses"),
                 color=alt.Color(
                     "AGE:N",
-                    title="Age",
                     scale=alt.Scale(scheme="blues", domain=AGE_BIN_LABELS),
-                    legend=alt.Legend(labelLimit=0)
+                    legend=horizontal_legend("Age", columns=4)
                 ),
                 tooltip=["Diagnosis:N", "AGE:N", "Count:Q"],
                 opacity=alt.condition(age_selection, alt.value(1), alt.value(0.2))
@@ -378,7 +397,11 @@ if view_type == "Diagnosed Mental Disorders":
             .encode(
                 y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
                 x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color("RACE:N", title="Race", legend=alt.Legend(labelLimit=0), scale = alt.Scale(scheme='set3')),
+                color=alt.Color(
+                    "RACE:N",
+                    legend=horizontal_legend("Race", columns=4),
+                    scale=alt.Scale(scheme='set3')
+                ),
                 tooltip=["Diagnosis:N", "RACE:N", "Count:Q"],
                 opacity=alt.condition(race_selection, alt.value(1), alt.value(0.2))
             )
@@ -405,7 +428,11 @@ if view_type == "Diagnosed Mental Disorders":
             .encode(
                 y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
                 x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color("EMPLOY:N", title="Social-Economic Status", legend=alt.Legend(labelLimit=0), scale = alt.Scale(scheme='tableau10')),
+                color=alt.Color(
+                    "EMPLOY:N",
+                    legend=horizontal_legend("Social-Economic Status"),
+                    scale=alt.Scale(scheme='tableau10')
+                ),
                 tooltip=["Diagnosis:N", "EMPLOY:N", "Count:Q"],
                 opacity=alt.condition(employ_selection, alt.value(1), alt.value(0.2))
             )
@@ -431,7 +458,11 @@ if view_type == "Diagnosed Mental Disorders":
             .encode(
                 y=alt.Y("Diagnosis:N", title="Disorder Type", axis=alt.Axis(labelLimit=300)),
                 x=alt.X("Count:Q", title="Number of Diagnoses"),
-                color=alt.Color("LIVARAG:N", title="Living Status", legend=alt.Legend(labelLimit=0), scale = alt.Scale(scheme='set2')),
+                color=alt.Color(
+                    "LIVARAG:N",
+                    legend=horizontal_legend("Living Status"),
+                    scale=alt.Scale(scheme='set2')
+                ),
                 tooltip=["Diagnosis:N", "LIVARAG:N", "Count:Q"],
                 opacity=alt.condition(livarag_selection, alt.value(1), alt.value(0.2))
             )
@@ -571,7 +602,11 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
                     axis=alt.Axis(labelLimit=300, labelPadding=10, titlePadding=80)
                 ),
                 x=alt.X("Count:Q", title="Number of Service Uses"),
-                color=alt.Color("SEX:N", title="Sex", legend=alt.Legend(labelLimit=0), scale = alt.Scale(domain=["Female", "Male", "Missing"], range=["#e78ac3", "#8da0cb", "#e41a1c"])),
+                color=alt.Color(
+                    "SEX:N",
+                    legend=horizontal_legend("Sex"),
+                    scale=alt.Scale(domain=["Female", "Male", "Missing"], range=["#e78ac3", "#8da0cb", "#e41a1c"]),
+                ),
                 tooltip=["Service:N", "SEX:N", "Count:Q"],
                 opacity=alt.condition(service_sex_selection, alt.value(1), alt.value(0.2))
             )
@@ -603,9 +638,8 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
                 x=alt.X("Count:Q", title="Number of Service Uses"),
                 color=alt.Color(
                     "AGE:N",
-                    title="Age",
                     scale=alt.Scale(scheme="blues", domain=AGE_BIN_LABELS),
-                    legend=alt.Legend(labelLimit=0)
+                    legend=horizontal_legend("Age", columns=4)
                 ),
                 tooltip=["Service:N", "AGE:N", "Count:Q"],
                 opacity=alt.condition(service_age_selection, alt.value(1), alt.value(0.2))
@@ -637,7 +671,11 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
                     axis=alt.Axis(labelLimit=300, labelPadding=10, titlePadding=80)
                 ),
                 x=alt.X("Count:Q", title="Number of Service Uses"),
-                color=alt.Color("RACE:N", title="Race", legend=alt.Legend(labelLimit=0),scale = alt.Scale(scheme='set3')),
+                color=alt.Color(
+                    "RACE:N",
+                    legend=horizontal_legend("Race", columns=4),
+                    scale=alt.Scale(scheme='set3')
+                ),
                 tooltip=["Service:N", "RACE:N", "Count:Q"],
                 opacity=alt.condition(service_race_selection, alt.value(1), alt.value(0.2))
             )
@@ -670,8 +708,7 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
                 x=alt.X("Count:Q", title="Number of Service Uses"),
                 color=alt.Color(
                     "EMPLOY:N",
-                    title="Social-Economic Status",
-                    legend=alt.Legend(labelLimit=0),
+                    legend=horizontal_legend("Social-Economic Status"),
                     scale = alt.Scale(scheme='tableau10')
                 ),
                 tooltip=["Service:N", "EMPLOY:N", "Count:Q"],
@@ -704,7 +741,11 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
                     axis=alt.Axis(labelLimit=300, labelPadding=10, titlePadding=80)
                 ),
                 x=alt.X("Count:Q", title="Number of Service Uses"),
-                color=alt.Color("LIVARAG:N", title="Living Status", legend=alt.Legend(labelLimit=0), scale = alt.Scale(scheme='set2')),
+                color=alt.Color(
+                    "LIVARAG:N",
+                    legend=horizontal_legend("Living Status"),
+                    scale=alt.Scale(scheme='set2')
+                ),
                 tooltip=["Service:N", "LIVARAG:N", "Count:Q"],
                 opacity=alt.condition(service_livarag_selection, alt.value(1), alt.value(0.2))
             )
@@ -804,7 +845,7 @@ else:
         plot2 = alt.Chart(subset).mark_bar().encode(y = alt.Y('types_reported:N',axis=alt.Axis(labelLimit=300, labelPadding=10, titlePadding=80)) , 
                                                 x = alt.X('mh:Q',
                                                             scale = alt.Scale(type = 'sqrt')).title('count of the mental health disorders'), 
-                                                            color = alt.Color("SAP:N",legend=alt.Legend(labelLimit=0)),
+                                                            color = alt.Color("SAP:N", legend=horizontal_legend("Substance use problem (SAP)")),
                                                             opacity=alt.condition(sap_selection, alt.value(1), alt.value(0.2))
                                                             ).properties( height = 500, 
                                                             width = 250,
