@@ -94,6 +94,7 @@ def preprocess(chunk: pd.DataFrame) -> pd.DataFrame:
     chunk["SAP"] = chunk["SAP"].apply(
         lambda val: "missing" if pd.isna(val) else str(val)
     )
+    chunk["CLIENT_COUNT"] = 1
     return chunk
 
 
@@ -109,27 +110,27 @@ def aggregate_chunks(
         chunk = preprocess(chunk)
 
         demo_frames.append(
-            chunk.groupby(DEMO_KEYS, dropna=False)[DIAGNOSIS_COLS + SERVICE_COLS]
+            chunk.groupby(DEMO_KEYS, dropna=False)[DIAGNOSIS_COLS + SERVICE_COLS + ["CLIENT_COUNT"]]
             .sum()
             .reset_index()
         )
 
         substance_frames.append(
-            chunk.groupby(SUBSTANCE_KEYS, dropna=False)[DIAGNOSIS_COLS]
+            chunk.groupby(SUBSTANCE_KEYS, dropna=False)[DIAGNOSIS_COLS + ["CLIENT_COUNT"]]
             .sum()
             .reset_index()
         )
 
     demo_df = (
         pd.concat(demo_frames)
-        .groupby(DEMO_KEYS, dropna=False)[DIAGNOSIS_COLS + SERVICE_COLS]
+        .groupby(DEMO_KEYS, dropna=False)[DIAGNOSIS_COLS + SERVICE_COLS + ["CLIENT_COUNT"]]
         .sum()
         .reset_index()
     )
 
     substance_df = (
         pd.concat(substance_frames)
-        .groupby(SUBSTANCE_KEYS, dropna=False)[DIAGNOSIS_COLS]
+        .groupby(SUBSTANCE_KEYS, dropna=False)[DIAGNOSIS_COLS + ["CLIENT_COUNT"]]
         .sum()
         .reset_index()
     )

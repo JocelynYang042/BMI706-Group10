@@ -194,6 +194,12 @@ if view_type == "Diagnosed Mental Disorders":
         st.warning("No diagnosed disorders found for the selected demographic filters.")
         st.stop()
 
+    state_totals = (
+        demographic_subset.groupby(["STATEFIP", "STATEFIP_code"], as_index=False)["CLIENT_COUNT"]
+        .sum()
+        .rename(columns={"CLIENT_COUNT": "TotalClients"})
+    )
+
     long_df = demographic_subset.melt(
         id_vars=["AGE", "RACE", "SEX", "EMPLOY", "LIVARAG", "STATEFIP", "STATEFIP_code"],
         value_vars=DIAGNOSIS_COLS,
@@ -224,6 +230,10 @@ if view_type == "Diagnosed Mental Disorders":
         .sum()
     )
     agg_map['STATEFIP_code'] = agg_map['STATEFIP_code'].astype(str)
+    map_data = agg_map.merge(state_totals, on=["STATEFIP", "STATEFIP_code"], how="left")
+    map_data["RatePercent"] = (
+        map_data["Count"] / map_data["TotalClients"].replace({0: pd.NA})
+    ).fillna(0) * 100
     states = alt.topo_feature(data.us_10m.url, 'states')
 
     background = alt.Chart(states).mark_geoshape(
@@ -232,6 +242,7 @@ if view_type == "Diagnosed Mental Disorders":
     ).project(
         type='albersUsa'
     ).properties(
+        width=320,
         height=400
     )   
 
@@ -241,21 +252,45 @@ if view_type == "Diagnosed Mental Disorders":
         color=alt.Color('Count:Q', scale=alt.Scale(type='log', scheme='blues'), title='Number of Diagnoses'),
         tooltip=[
             alt.Tooltip('STATEFIP:N', title='State'),
+            alt.Tooltip('Count:Q', title='Number of Diagnoses'),
+            alt.Tooltip('RatePercent:Q', title='Percent Diagnosed', format='.2f')
+        ]
+    ).transform_lookup(
+        lookup='id',
+        from_=alt.LookupData(map_data, 'STATEFIP_code', ['STATEFIP', 'Count', 'RatePercent'])
+    ).project(
+        type='albersUsa'   
+    )
+
+    diagnosis_rate_max = float(map_data["RatePercent"].max() or 1)
+    rate_chart = alt.Chart(states).mark_geoshape(
+        stroke='white',
+    ).encode(
+        color=alt.Color(
+            'RatePercent:Q',
+            scale=alt.Scale(scheme='tealblues', domain=[0, diagnosis_rate_max]),
+            title='Diagnosed (%)'
+        ),
+        tooltip=[
+            alt.Tooltip('STATEFIP:N', title='State'),
+            alt.Tooltip('RatePercent:Q', title='Percent Diagnosed', format='.2f'),
             alt.Tooltip('Count:Q', title='Number of Diagnoses')
         ]
     ).transform_lookup(
         lookup='id',
-        from_=alt.LookupData(agg_map, 'STATEFIP_code', ['STATEFIP', 'Count'])
+        from_=alt.LookupData(map_data, 'STATEFIP_code', ['STATEFIP', 'RatePercent', 'Count'])
     ).project(
-        type='albersUsa'   
-    ).properties(
-        height=400
+        type='albersUsa'
     )
 
-    final_chart = (background + map_chart).properties(
-        title=f'Geographical Distribution of {selected_diagnosis} Diagnoses Across US States',
-        height=400
+    count_plot = (background + map_chart).properties(
+        title=f'Number of {selected_diagnosis} Diagnoses',
     )
+    rate_plot = (background + rate_chart).properties(
+        title=f'Share of {selected_diagnosis} Diagnoses out of All Clients (%) in Each State',
+    )
+
+    final_chart = alt.vconcat(count_plot, rate_plot).resolve_scale(color="independent")
 
     st.markdown("""
     <style>
@@ -412,6 +447,12 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
         st.warning("No service utilization data matched the selected demographic filters.")
         st.stop()
 
+    state_totals = (
+        demographic_subset.groupby(["STATEFIP", "STATEFIP_code"], as_index=False)["CLIENT_COUNT"]
+        .sum()
+        .rename(columns={"CLIENT_COUNT": "TotalClients"})
+    )
+
     long_df = demographic_subset.melt(
         id_vars=["AGE", "RACE", "SEX", "EMPLOY", "LIVARAG", "STATEFIP", "STATEFIP_code"],
         value_vars=SERVICE_COLS,
@@ -443,6 +484,10 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
         .sum()
     )
     agg_map['STATEFIP_code'] = agg_map['STATEFIP_code'].astype(str)
+    map_data = agg_map.merge(state_totals, on=["STATEFIP", "STATEFIP_code"], how="left")
+    map_data["RatePercent"] = (
+        map_data["Count"] / map_data["TotalClients"].replace({0: pd.NA})
+    ).fillna(0) * 100
     
     states = alt.topo_feature(data.us_10m.url, 'states')
 
@@ -452,6 +497,7 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
     ).project(
         type='albersUsa'
     ).properties(
+        width=320,
         height=400
     )
     
@@ -462,20 +508,44 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
         tooltip=[
             alt.Tooltip('STATEFIP:N', title='State'),
             alt.Tooltip('Count:Q', title='Number of Service Uses'),
+            alt.Tooltip('RatePercent:Q', title='Percent Receiving Service', format='.2f'),
         ]
     ).transform_lookup(
         lookup='id',
-        from_=alt.LookupData(agg_map, 'STATEFIP_code', ['STATEFIP', 'Count'])
+        from_=alt.LookupData(map_data, 'STATEFIP_code', ['STATEFIP', 'Count', 'RatePercent'])
     ).project(
         type='albersUsa'   
-    ).properties(
-        height=400
     )
     
-    final_chart = (background + map_chart).properties(
-        title=f'Geographical Distribution of {selected_service} Across US States',
-        height=400
+    service_rate_max = float(map_data["RatePercent"].max() or 1)
+    rate_chart = alt.Chart(states).mark_geoshape(
+        stroke='white'
+    ).encode(
+        color=alt.Color(
+            'RatePercent:Q',
+            scale=alt.Scale(scheme='yellowgreen', domain=[0, service_rate_max]),
+            title='Service Use (%)'
+        ),
+        tooltip=[
+            alt.Tooltip('STATEFIP:N', title='State'),
+            alt.Tooltip('RatePercent:Q', title='Percent Receiving Service', format='.2f'),
+            alt.Tooltip('Count:Q', title='Number of Service Uses'),
+        ]
+    ).transform_lookup(
+        lookup='id',
+        from_=alt.LookupData(map_data, 'STATEFIP_code', ['STATEFIP', 'RatePercent', 'Count'])
+    ).project(
+        type='albersUsa'
     )
+
+    count_plot = (background + map_chart).properties(
+        title=f'Number of {selected_service} Uses',
+    )
+    rate_plot = (background + rate_chart).properties(
+        title=f'Share of {selected_service} Uses out of All Clients (%) in Each State',
+    )
+
+    final_chart = alt.vconcat(count_plot, rate_plot).resolve_scale(color="independent")
     
     st.altair_chart(final_chart, use_container_width=True)
     
@@ -648,8 +718,8 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
 else:
     
     
-    st.subheader('Whether people have a Substance use diagnosis or not')
-    dia = st.radio('Substance use related disorders diagonsis', ['YES','NO'])
+    st.subheader('Whether People Have a Substance Use Diagnosis or Not')
+    dia = st.radio('Filter to only people WITH a substance use diagnosis?', ['YES','NO'])
     st.write("If you choose yes, the plots will focus on population with\
             substance-related disorders reported ")
     st.write("If you choose no, the plots will focus on comparing how the mental\
