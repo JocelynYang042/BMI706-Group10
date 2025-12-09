@@ -844,13 +844,24 @@ else:
         subset['SAP'] = subset['SAP'].map(SAP_map).fillna(subset['SAP'])
         subset['types_reported'] = subset['types_reported'].map(TYPE_MAP).fillna(subset['types_reported'])
         sap_selection = alt.selection_point(fields=["SAP"], bind="legend")
-        plot2 = alt.Chart(subset).mark_bar().encode(y = alt.Y('types_reported:N',axis=alt.Axis(labelLimit=300, labelPadding=10, titlePadding=80)) , 
+        click_selection = alt.selection_single(fields = ['SAP'],bind = 'legend')
+        
+        plot2 = alt.Chart(subset).mark_bar().encode(y = alt.Y('types_reported:N',axis=alt.Axis(labelLimit=300, labelPadding=10, titlePadding=50)) , 
                                                 x = alt.X('mh:Q',
                                                             scale = alt.Scale(type = 'sqrt')).title('count of the mental health disorders'), 
-                                                            color = alt.Color("SAP:N", legend=horizontal_legend("Substance use problem (SAP)")),
+                                                            color = alt.Color("SAP:N", legend=alt.Legend(title = "Substance use problem (SAP)", orient = 'top',direction = 'horizontal')),
                                                             opacity=alt.condition(sap_selection, alt.value(1), alt.value(0.2))
-                                                            ).properties( height = 500, 
-                                                            width = 250,
-                                                            title = 'Distribution of total count of mental health across types and substances use problem(SAP)').add_params(sap_selection)
+                                                            ).properties( height = 350, 
+                                                            width = 400,
+                                                            title = 'Distribution of total count of mental health across types and substances use problem(SAP)').add_params(sap_selection).add_selection(click_selection)
+        plot3 = alt.Chart(subset).mark_bar().encode(x = alt.X('types_reported:N',axis=alt.Axis(labelLimit=200, labelPadding=5, titlePadding=20)) , 
+                                                y = alt.Y('mh:Q',
+                                                            scale = alt.Scale(type = 'sqrt'),axis=alt.Axis(labelLimit=300, labelPadding=10, titlePadding=150)).title('count of the mental health disorders')
+                                                            ,).properties( height = 200, 
+                                                            width = 400,
+                                                            title = 'Distribution of total count of mental health for the specific type of SAP').transform_filter(click_selection)
+        
+
         #plot2 = plot2.configure_title(fontSize = 15, anchor = 'middle')
-        st.altair_chart(plot2, use_container_width=True)
+        combine_c2 = alt.vconcat(plot2, plot3)
+        st.altair_chart( combine_c2, use_container_width=True)
