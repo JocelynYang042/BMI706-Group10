@@ -570,7 +570,7 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
                     axis=alt.Axis(labelLimit=300, labelPadding=10, titlePadding=80)
                 ),
                 x=alt.X("Count:Q", title="Number of Service Uses"),
-                color=alt.Color("SEX:N", title="Sex", legend=alt.Legend(labelLimit=0)),
+                color=alt.Color("SEX:N", title="Sex", legend=alt.Legend(labelLimit=0), scale = alt.Scale(domain=["Female", "Male", "Missing"], range=["#e78ac3", "#8da0cb", "#e41a1c"])),
                 tooltip=["Service:N", "SEX:N", "Count:Q"],
                 opacity=alt.condition(service_sex_selection, alt.value(1), alt.value(0.2))
             )
@@ -637,7 +637,7 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
                     axis=alt.Axis(labelLimit=300, labelPadding=10, titlePadding=80)
                 ),
                 x=alt.X("Count:Q", title="Number of Service Uses"),
-                color=alt.Color("RACE:N", title="Race", legend=alt.Legend(labelLimit=0)),
+                color=alt.Color("RACE:N", title="Race", legend=alt.Legend(labelLimit=0),scale = alt.Scale(scheme='set3')),
                 tooltip=["Service:N", "RACE:N", "Count:Q"],
                 opacity=alt.condition(service_race_selection, alt.value(1), alt.value(0.2))
             )
@@ -671,7 +671,8 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
                 color=alt.Color(
                     "EMPLOY:N",
                     title="Social-Economic Status",
-                    legend=alt.Legend(labelLimit=0)
+                    legend=alt.Legend(labelLimit=0),
+                    scale = alt.Scale(scheme='tableau10')
                 ),
                 tooltip=["Service:N", "EMPLOY:N", "Count:Q"],
                 opacity=alt.condition(service_employ_selection, alt.value(1), alt.value(0.2))
@@ -703,7 +704,7 @@ elif view_type == "Mental Health Service Use": # Mental Health Service Use
                     axis=alt.Axis(labelLimit=300, labelPadding=10, titlePadding=80)
                 ),
                 x=alt.X("Count:Q", title="Number of Service Uses"),
-                color=alt.Color("LIVARAG:N", title="Living Status", legend=alt.Legend(labelLimit=0)),
+                color=alt.Color("LIVARAG:N", title="Living Status", legend=alt.Legend(labelLimit=0), scale = alt.Scale(scheme='set2')),
                 tooltip=["Service:N", "LIVARAG:N", "Count:Q"],
                 opacity=alt.condition(service_livarag_selection, alt.value(1), alt.value(0.2))
             )
